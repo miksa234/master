@@ -1,8 +1,8 @@
 # C extensions
 *.so
-data/cached_pools.csv
-data/cached-honeypot.csv
-data/cached-tokens.csv
+src/data/cached_pools.csv
+src/data/cached-honeypot.csv
+src/data/cached-tokens.csv
 
 # Packages
 *.egg
