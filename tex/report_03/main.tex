@@ -1,0 +1,648 @@
+\include{./preamble.tex}
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+% Node styles
+\tikzstyle{new style 0}=[fill={rgb,255: red,128; green,128; blue,128},
+draw=black, shape=circle, inner sep=0.5mm]
+\tikzstyle{1}=[fill=white, draw=black, shape=circle, font=\scriptsize,
+        inner sep=0.5mm, outer sep=0.5mm, minimum width=0.5mm]
+
+% Edge styles
+\tikzstyle{new edge style 0}=[-, draw={rgb,255: red,191; green,191; blue,191}, ultra thin]
+\tikzstyle{new edge style 1}=[-, draw={rgb,255: red,191; green,0; blue,64},
+ultra thick]
+\tikzstyle{new edge style 2}=[-, draw={rgb,255: red,191; green,0; blue,64}, in=60, out=120, dotted]
+
+\begin{document}
+
+\maketitle
+
+\section{Reinforcement Learning}
+This report is just going to be about the things I gathered relevant for
+solving my problem with Reinforcement learning, the focus is on the things I
+did not know until now. The first milestone would be to apply the AlphaZero
+algorithm on the problem. This means I have to know about Markov Decision
+Process and Monte Carlo Tree search. One of the questions faced is also how
+to encode the state, hence the need to fall back to Graph neural networks
+which utilize edge weights.
+\subsection{Markov Decision Process}
+In comparison with supervised learning, reinforcement learning is not fed
+directly with labeled data, instead it learns through an agent which takes
+actions and is rewarded based on the outcome of these actions. Hence, this
+method is better suited for graph based problems and learning games, where a
+decision needs to be made based on the environment. In these cases the
+combinatorial complexity of the game is too big, such that supervised
+learning would lack labeled data. For instance the Shannon number is
+$10^{120}$, which is the lower bound of all possible positions in chess.
+In this chapter we will go through the foundation of reinforcement learning
+based no \cite[Chapter~17]{ml_foundations}.
+
+The general learning scenario is based on the agent collecting information
+through actions, interacting with the environment. In response to an action
+the agent will enter a new state and will be given a reward depending on the
+general goal \ref{fig: 1}. For example the action that wins a decision wining game, the
+agent will get a reward of $+1$. The agents objective is to maximize the
+reward and by doing this determines the best curs of action at a given
+state, called the policy.
+
+\begin{figure}[h!]
+    \centering
+    \begin{tikzpicture}
+
+        \node[align=center, ellipse, draw, ultra thick] (a)  {Agent};
+        \node[align=center, ellipse, draw, below=3cm of a, ultra thick] (e) {Environment};
+
+
+        \draw[->, ultra thick, blue] (a) to[out=0, in=0] node [midway,
+            right, text=black] {action} (e);
+        \draw[->, ultra thick, red] (e) to[out=160, in=200]
+            node [midway, right, text=black] {state} (a) ;
+        \draw[->, ultra thick, red] (e) to[out=180, in=180]
+            node [midway, left, text=black] {reward} (a);
+
+    \end{tikzpicture}
+    \caption{Reinforcement learning scenario \label{fig: 1}}
+    \label{}
+\end{figure}
+
+At each step the agent faces a decision to choose an action leading to a new
+state and the reward associated with it. Thereby the agent faces a dilemma in
+this choice based on the previous experience with the state and action,
+should the agent choose to export this information about the environment \&
+states and optimize for the reward or should the agent explore other unknown
+states potentially leading to a more favorable outcome. In reinforcement
+learning this is called "exploration versus exploitation trade off.
+
+Also, a key difference to traditional supervised learning, reinforcement
+learning does not sample features based on a fixed distribution. Essentially
+the training and testing phases are not separated, but rather combined in
+each step.
+\newline
+
+The two main learning settings are distinguished, the setting where the
+full environmental model is known and unknown.
+
+The mathematical model which describes the agent's iteration with the
+environment is the Markov decision process (MPD).
+\begin{definition}[Markov decision process]
+    The MDP is defined by 4 tuple $(S, A, \delta, R_a)$:
+    \begin{itemize}
+        \item The set of all states $S$, with a start state $s_0 \in S$,
+        \item The set of all actions $A$,
+        \item The transition probability $\mathbb{P}[s'|s, a] = \int_{S'}
+            P_a(s, s') ds'$
+        \item The reward probability $\mathbb{P}[r'|s, a] =
+            \int_{S'}R_a\left(s', s  \right)ds' $
+    \end{itemize}
+\end{definition}
+The transition probability $\mathbb{P}[s'|s, a]$ describes the probability of
+the agent landing in state $s'$, when he is initially at state $s$ and takes
+an action $a$. Similarity the reward probability is explained in the same way. The
+structure of this state transition only depends on the last state and the
+action taken and not on the whole history of states and actions hence the
+Markov property and the naming of the model. Usually the state transitions and
+rewards are deterministic, in this case the transition and reward probability
+is $1$ and the MDP is called \textbf{deterministic} and the reward is $r(s, a)$.
+\begin{figure}[h!]
+    \centering
+    \begin{tikzpicture}
+
+        \node[align=center, circle, draw, ultra thick, minimum size=1cm] (1)  {$s_t$};
+        \node[align=center, circle, draw, ultra thick, right=of 1, minimum size=1cm] (2)
+            {$s_{t+1}$};
+        \node[align=center, circle, draw, ultra thick, right=of 2, minimum
+            size=1cm] (3)
+            {$s_{t+2}$};
+
+        \draw[->, dotted, ultra thick, -latex] (-1.5, 0) to (1);
+        \draw[->, dotted, ultra thick, -latex] (3) to (5.5, 0);
+        \draw[->, -latex] (1) to node[midway, below] {$a_t$} node[midway,
+            above] {$r_{t+1}$} (2);
+        \draw[->, -latex] (2) to node[midway, below] {$a_{t+1}$} node[midway,
+            above] {$r_{t+2}$} (3);
+
+    \end{tikzpicture}
+    \caption{Deterministic discrete MDP \label{fig: 2} \cite{ml_foundations}}
+    \label{}
+\end{figure}
+In the discrete model the agent will preform actions in a set of decision
+epochs $t \in {0,\ldots,T}$ \ref{fig: 2}, this is the usual model adopted for a wide range
+of problems. The MDP is called \textbf{finite} when both $S$ and $A$ are
+finite sets. Furthermore, the MDP has a \textbf{finite time horizon} when $T$
+is finite.
+\newline
+
+The goal for the agent in an MPD is to find a good policy for the decision.
+The policy is a function, which given a state returns a probability
+distribution over the possible actions from the given state. The choice is
+then the action with the highest probability.
+\begin{definition}[Policy]
+    A policy is a mapping $\pi : S \to \Delta\left( A \right)$, where $S$ is
+    the state space and $\Delta(A)$ is the set of probability distributions
+    over A.
+    \newline
+
+    We call the policy deterministic if:
+    \begin{align}
+        \forall s \in S\;\; \exists !  a\in A:\quad \pi(s)(a) = 1
+    \end{align}
+    In this case we have $\text{im}(\pi) = A$, and we can say $\pi: S \to A$ with
+    $\pi(s) = a$.
+\end{definition}
+With the definition of a policy, the aim of the agent can be expressed as
+trying to find a policy that maximizes the total return. For a discrete
+policy the total return is
+\begin{align}
+    &\sum_{t=0}^{T} r(s_t, \pi(s_t)) & \text{finite horizon}\\
+    &\sum_{t=0}^{\infty}\gamma^{t} r(s_t, \pi(s_t)) & \text{infinite horizon}
+\end{align}
+where $r(s_t, \pi(s_t))$ is the reward function for the next state and
+$\gamma \in [0, 1)$ a discount factor for future rewards.
+\newline
+To quantify what is the optimal policy, it is natural to define the value of the
+policy at a given state.
+\begin{definition}[Policy value]
+    The value $V_\pi(s)$ of the policy $\pi$ at state $s \in S$ is defined as
+    the expected value of the total reward over the policy distribution
+    $\pi(s_t)$ of state $s_t \in S$ at epoch $t \le T$. For the finite horizon
+    it is
+    \begin{align}
+        V_\pi(s) = \mathbb{E}_{a_t\sim\pi(s_t)}\left[\sum_{t=0}^{T}r(s_t,
+        a_t) \Bigg| s_0 = s \right].
+    \end{align}
+    For the infinite horizon for $\gamma \in [0, 1)$
+    \begin{align}
+        V_\pi(s) =
+        \mathbb{E}_{a_t\sim\pi(s_t)}\left[\sum_{t=0}^{\infty}\gamma^{t} r(s_t,
+        a_t) \Bigg| s_0 = s \right].
+    \end{align}
+\end{definition}
+Thereby the optimal policy can be defined in the following way
+\begin{definition}[Optimal policy]
+    The policy $\pi^{*}$ is called optimal if for any policy $\pi$ it
+    holds that
+    \begin{align}
+        V_{\pi^{*}}(s) \ge V_\pi(s) \quad \forall s \in S.
+    \end{align}
+\end{definition}
+Similarly to the policy value we can give the pair $(s, a)$ associated to a
+policy $\pi$ a value, the so called state-action value
+\begin{definition}[State-action value]
+    The state-action value function $Q_\pi$ associated with a policy $\pi$ is
+    defined on all pairs state-action pairs $(s, a) \in S \times A$
+    \begin{align}
+        Q_\pi(s, a) &= \mathbb{E}[r(s,a)]
+        \mathbb{E}_{a_t\sim\pi(s_t)}\left[ \sum_{t=1}^{\infty}\gamma^{t}
+            r(s_t, a_t)\Bigg |\; s_0 = s,\; a_0 = a \right] \\
+        \nonumber
+            &= \mathbb{E}\left[r(s,a) + \gamma V_\pi(s_1)\Big| \;s_0=s,\;
+            a_0=a   \right].
+    \end{align}
+    Note that the expected value of the state-value function at $(s, a)$ over the policy
+    distribution at state $s$ is the policy value at $s$, i.e.
+    \begin{align}
+        \mathbb{E}_{a\sim\pi(s)}\left[Q_\pi(s, a)\right] = V_\pi(s).
+    \end{align}
+\end{definition}
+With the help of these definitions it can be shown that for any MDP there is
+a deterministic optimal policy.
+\begin{theorem}[Policy Improvement Theorem]
+    For any two policies $\pi'$ and $\pi$, it holds that
+    \begin{align}
+         &\mathbb{E}_{a\sim\pi'(s)}\left[Q_\pi(s, a)\right]
+        \ge \mathbb{E}_{a\sim\pi(s)}\left[Q_\pi(s, a)\right]  \quad \forall s \in S
+        \\
+         &\quad \implies  V_{\pi'}(s) \ge V_\pi (s) \quad
+         \forall s \in S\nonumber.
+    \end{align}
+\end{theorem}
+\begin{theorem}[Bellman's optimality condition]
+    A policy $\pi$ is optimal if and only if for all state-action pairs
+    $(s, a) \in S x A$ with $\pi(s)(a) > 0$ it holds that
+    \begin{align}
+        a \in \argmax_{a'\in A} Q_\pi(s, a').
+    \end{align}
+\end{theorem}
+\begin{theorem}{Existence of optimal deterministic policy}
+    Any finite MDP has an optimal deterministic policy.
+\end{theorem}
+Consider an optimal deterministic policy $\pi^{*}$ with its policy value and
+state-action value functions $V^{*}$ and $Q^{*}$. The optimal policy for all
+state is
+\begin{align}
+    \pi^{*}(s) = \argmax_{a \in A} Q^{*}(s,a).
+\end{align}
+Thus, the agent only needs to know the state-action value function $Q^{*}$ to
+determine the optimal policy, and does not need to have information about the
+transition and reward probabilities. Using the definition of the state-value
+function for $Q^{*}$, $V^{*}(s) = Q^{*}(s, \pi^{*}(s))$ gives a system of
+equations called \textit{Bellman equations}:
+\begin{align}
+    V^{*}(s) = \max_{a\in A} \left\{ \mathbb{E}[r(s, a)] + \gamma\sum_{s'\in S}
+    \mathbb{P}[s'|s,a] V^{*}(s') \right\} \quad \forall s \in S.
+\end{align}
+\begin{theorem}[Bellman Equations]
+    The policy value $V_\pi(s)$ of a policy $\pi$ at state $s$ for an MDP
+    with infinite horizon is subjected to the following linear system of
+    equations
+    \begin{align}
+        V^{*}(s) = \mathbb{E}_{a_1 \sim \pi(s)}[r(s, a_1)] + \gamma\sum_{s'\in S}
+        \mathbb{P}[s'|s, \pi(s)] V^{*}(s') \quad \forall s \in S.
+    \end{align}
+\end{theorem}
+We can rewrite the linear system
+\begin{align}
+    v = \gamma P v + r,
+\end{align}
+where
+\begin{align}
+    &p_{s, s'} = \mathbb{P}[s'|s, \pi(s)] \quad \forall s,s' \in S \quad
+    \text{is the transition probability matrix,}\\
+    &v_s = V_\pi(s) \quad \forall s \in S \quad \text{is the value vector and }\\
+    &r_s = \mathbb{E}[r(s, \pi(s)] \quad \forall s \in S \quad \text{is the reward
+    vector}.
+\end{align}
+For an MDP with finite horizon with a known probability matrix $P$ and a
+known reward expectation $r$, linear algebra gives a unique solution for
+the value vector by matrix inversion
+\begin{align}
+    v^{*} = (I - \gamma P)^{-1} R,
+\end{align}
+where $I$ is the appropriate identity matrix.
+\newline
+
+Proofs for the theorems can be found in \cite[Chapter~17]{ml_foundations}.
+\subsection{Monte Carlo Tree Search}
+MCTS is a search algorithm for decision processes like MDP. The algorithm
+focuses on finding the most favorable course of action by uniformly expanding
+the search tree at each step and applying random actions/decisions until
+reaching a terminal state, this outcome is then communicated back to the
+start (backpropagation). In the last decade MCTS has been combined
+with learning based methods \cite{alphazero} to produce agents which can beat
+humans in Chess, GO and other games.
+\newline
+
+On a basic level the fundamental concept of the algorithm is that the true
+value of an action can be approximated by random simulation, which ultimately
+adjusts the policy efficiently to derive a best-first strategy
+\cite{mcts_survey}. One search iteration is done in four steps:
+\newline
+
+\textbf{1. Selection Phase:} Also called Tree-Traversal Phase, starts at the
+root node state and walks down until reaching a leaf node state with a
+selection policy. The leaf node state is one that is not yet fully expanded,
+i.e. has unvisited children or is not a terminal state. The selection policy of
+the walk is done through the confidence bound ($UCB1$), where the idea
+is to weight out and balance the exploration vs exploitation. The next action
+is chosen such that the next node has the biggest $UCB1$ value. The basic
+$UCB1$ formula is
+\begin{align}
+    UCB1 = \frac{w_i}{n_i} + C \sqrt{\frac{\ln N_i}{n_i}},
+\end{align}
+where $w_i$ is the number of wins of the node, $n_i$ the number of visits of
+the node, $N_i$ the number of visits of the parent node and $C\in R$ is a
+constant, usually chosen to be $C = \sqrt{2}$
+\newline
+
+\textbf{2. Node Expansion Phase:} An extra node is added into the tree according
+to the available actions, if the node state is not a terminal one.
+\newline
+
+\textbf{3. Simulation Phase}: Also called Roll-out state. A simulation/roll-out
+is from the current node selecting actions randomly until a terminal node
+state.
+\newline
+
+\textbf{4. Backpropagation Phase:} The result of the simulation is used to
+update the information in the nodes traversed, such as the outcome/reward of
+the terminal state at the end of the simulation and also the visit count of
+the nodes.
+\begin{figure}[htb!]
+    \centering
+    \begin{tikzpicture}[scale=0.8, transform shape]
+        \node[align=center, ellipse, draw, ultra thick] (0)  {Start};
+
+        \node[align=center, draw, ultra thick, below=of 0] (1)
+            {current state $s_0$};
+
+        \node[align=center, draw, ultra thick, below=of 1] (2)
+            {is current state\\ a leaf node?};
+
+        \node[align=center, draw, ultra thick, below=of 2] (3)
+            {current state = child node \\
+            that maximizes $UCB1(s_k)$?};
+
+        \node[align=center, draw, ultra thick, right=2cm of 2] (4)
+            {Was the current state\\ visited before ($n_k > 0$)};
+
+        \node[align=center, ellipse, draw, ultra thick, above=of 4] (5)
+            {Roll-out};
+
+        \node[align=center, draw, ultra thick, below=of 4] (6)
+            {
+                add a new state to the tree \\
+                for each available action
+            };
+
+        \node[align=center, draw, ultra thick, below=of 6] (7)
+            {current state = first new child node};
+
+        \node[align=center, draw, ultra thick, below=of 7] (8)
+            {Roll-out};
+
+        \draw[->, ultra thick] (0) to (1);
+        \draw[->, ultra thick] (1) to (2);
+        \draw[->, ultra thick] (2) to node[midway, right] {NO} (3);
+        \draw[->, ultra thick] (2) to node[midway, above] {YES} (4);
+        \draw[->, ultra thick] (4) to node[midway, right] {YES} (5);
+        \draw[->, ultra thick] (4) to node[midway, right] {NO} (6);
+        \draw[->, ultra thick] (6) to (7);
+        \draw[->, ultra thick] (7) to (8);
+
+        \draw[->, ultra thick, in=180, out=180] (3) to (2);
+
+    \end{tikzpicture}
+    \caption{MCTS algorithmic diagram \label{fig: 3}}
+\end{figure}
+
+The general algorithmic structure is described in \cite{mcts_survey}, denoted
+in \ref{alg: 1}. For clarity purposes the diagram of the algorithm is in
+\ref{fig: 3}.
+\begin{algorithm}
+\caption{MCTS Algorithm}\label{alg: 1}
+    \begin{algorithmic}
+        \Require state $s_0$
+        \While{within computational budget}
+            \State $s_k \gets \text{SelectionPolicy}(s_0)$
+            \State  $w \gets \text{RollOut}(s_k)$
+            \State $\text{BackPropagate}(s_k, w)$
+        \EndWhile
+        \Ensure $a\left(\text{BestChild}(s_0)\right)$
+    \end{algorithmic}
+\end{algorithm}
+The search starts with an input state $s_0$, and selects the next set of
+states based on the selection policy, which is are the states with the
+biggest $UCB1$ value. The state $s_k$ is reached after the selection phase
+and the expansion, upon which a simulation is run giving the terminal
+result/outcome $w$. The outcome is then communicated back from $s_k$ back to the
+root node in the path taken to reach $s_k$ from the root node. At the end the
+algorithm returns then the  action $a$ leading to the best child of $s_0$.
+The number of search iterations is usually indicated by a specific search
+time or number of search steps given and is denoted by the while statement.
+
+\subsection{Graph Neural Networks}
+This section is an introductory the Graph Neural Networks (GNNs)
+\cite{gnn_overview}. GNNs are Neural Networks (NNs) which operate over graph
+structured data. Let further denote a graph as a tuple $(E, V)$, where $E$
+are edges and $V$ are the nodes of the graph. Also let $A$ be the adjacency
+matrix of the graph, where $a_{ij} = 1$ if $(i, j) \in E$ and $a_{ij} =0$
+otherwise. Finally, denote $X$ to be the node features.
+\newline
+
+There are multiple types of GNNs some more complex than others
+\cite{gnn_overview}, but the core principles are taken from convolutional
+NNs. An image can be seen as a grid graph, where each node corresponds to a
+pixel and is connected to its neighboring pixels. Simple convolution in
+images aggregates pixel by applying a simple operation (kernel) on its
+neighborhood, updating the pixels value. Similarly, in a graph the
+convolutional GNN will take the information of the neighboring node features
+(and edge features) to update the underlying node by applying some function
+on them \ref{fig: 4}.
+\begin{figure}[htb!]
+    \centering
+    \begin{tikzpicture}
+            \node [style=new style 0] (6) at (3.25, 1) {};
+            \node [style=new style 0] (7) at (3, -0.75) {};
+            \node [style=new style 0] (8) at (1, -2.5) {};
+            \node [style=new style 0] (11) at (-1.5, -1.5) {};
+            \node [style=1] (12) at (0.75, 0) {$x_a$};
+            \node [style=1] (13) at (-1, 0.25) {$x_c$};
+            \node [style=1] (14) at (0.75, 1.25) {$x_b$};
+            \node [style=1] (15) at (2, 0) {$x_d$};
+            \node [style=1] (16) at (0.75, -1.25) {$x_e$};
+
+            \draw [style=new edge style 0] (6) to (7);
+            \draw [style=new edge style 0] (15) to (7);
+            \draw [style=new edge style 0] (15) to (6);
+            \draw [style=new edge style 0] (16) to (8);
+            \draw [style=new edge style 0] (11) to (16);
+            \draw [style=new edge style 0] (13) to (11);
+            \draw [style=new edge style 1] (12) to (16);
+            \draw [style=new edge style 1] (12) to (15);
+            \draw [style=new edge style 1] (13) to (12);
+            \draw [style=new edge style 1] (14) to (12);
+
+
+
+            \node [style=new style 0] (21) at (11.25, 1) {};
+            \node [style=new style 0] (22) at (11, -0.75) {};
+            \node [style=new style 0] (23) at (9, -2.5) {};
+            \node [style=new style 0] (24) at (6.5, -1.5) {};
+            \node [style=1] (17) at (8.75, 0) {$x_a'$};
+            \node [style=new style 0] (25) at (7, 0.25) {};
+            \node [style=new style 0] (26) at (8.75, 1.25) {};
+            \node [style=new style 0] (27) at (10, 0) {};
+            \node [style=new style 0] (28) at (8.75, -1.25) {};
+
+            \draw [style=new edge style 0] (26) to (17);
+            \draw [style=new edge style 0] (17) to (25);
+            \draw [style=new edge style 0] (17) to (27);
+            \draw [style=new edge style 0] (17) to (28);
+            \draw [style=new edge style 0] (28) to (24);
+            \draw [style=new edge style 0] (28) to (23);
+            \draw [style=new edge style 0] (27) to (21);
+            \draw [style=new edge style 0] (27) to (22);
+            \draw [style=new edge style 0] (21) to (22);
+            \draw [style=new edge style 0] (25) to (24);
+
+            \draw [style=new edge style 1, in=120, out=60, dotted, ->] (12)
+                to node[midway, above] {$g(x_a, X_{\mathcal{N}_a}) = x_a'$} (17);
+    \end{tikzpicture}
+    \caption{Convolutional GNNs: simple example \label{fig: 4}}
+\end{figure}
+
+For a graph we can define a node's neighborhood, for a node $i \in V$ a
+nodes 1-hop neighborhood is
+\begin{align}
+    \mathcal{N}_i := \left\{ j: (i,j) \in E\; \wedge \; (j, i) \in E
+    \right\}.
+\end{align}
+The features of the 1-hop neighborhood $\mathcal{N}_i$ of the node are
+\begin{align}
+    X_{\mathcal{N}_i} = \left\{ \left\{ x_j: j \in \mathcal{N}_i \right\}
+    \right\} .
+\end{align}
+Then the convolutional function $g$ operates on the features of the node
+itself and on the features of its 1-hop neighborhood $g\left(x_i,
+X_{\mathcal{N}_i}\right)$. Suitable functions that preserve the invariance
+or equivariance of the graph. When applying a permutation matrix $P$ we need
+to permute the rows and the columns of the adjacency matrix $A$, which
+results to $PAP^{T}$, leading to functions satisfying
+\begin{align}
+    &f(PX, PAP^{T}) = f(X, A) \quad \text{Invariance}\\
+    &f(PX, PAP^{T}) = Pf(X, A) \quad \text{Equivariance}
+\end{align}
+By applying the local function $g$ on all nodes and their neighborhoods we
+get
+\begin{align}
+    f(X, A) =
+    \begin{bmatrix}
+        g(x_1, X_{\mathcal{N}_1})\\
+        \vdots\\
+        g(x_n, X_{\mathcal{N}_n})
+    \end{bmatrix},
+\end{align}
+thus $g$ needs to be permutation invariant, to not depend on the order in
+$X_{\mathcal{N}_i}$ and thereby $f$ will be equivariant. Conventionally the
+local function $g$ is referred to as "diffusion", "propagation" or "message
+passing" and the global function $f$ as a "GNN Layer"
+\cite[Chapter~5]{gnn_overview}. The majority of the GNN Layer types can be
+differentiated by three types, \textit{Convolutional}, \textit{Attentional}
+and \textit{Message-passing} GNN. They are all different in the sense how $g$
+incorporates the neighboring features, where $g$ needs to be permutation
+invariant.
+\newline
+
+The convolutional type \cite[Chapter~5]{gnn_overview} as described above for
+clarification, the features of the neighbors are aggregated additionally with
+fixed weights $c_{ij}$ after applying some function $\psi$ on them
+\begin{align}
+    x_i' = g\left( x_i, \bigoplus_{j\in \mathcal{N}_i} c_{ij} \psi(x_j) \right).
+\end{align}
+
+In attention type \cite{gan_velickovic} features of neighbors are applied
+with implicit weights, via attention. The attention coefficient for each
+pair is computed via a function $a_{ij} = a(x_i, x_j)$, usually a
+softmax function resulting in
+\begin{align}
+    x_i' = g\left( x_i, \bigoplus_{j\in \mathcal{N}_i} a(x_i, x_j) \psi(x_j) \right).
+\end{align}
+
+The message passing type \cite[Chapter~5]{gnn_overview} computes arbitrary
+vector "messages", these are then sent through the edges back to the
+original node which gives
+\begin{align}
+    x_i' = g\left( x_i, \bigoplus_{j\in \mathcal{N}_i} \psi(x_i, x_j) \right).
+\end{align}
+
+In practice the functions $g$ and $\psi$ are learnable and are represented by
+some appropriate NN structure and the $\bigoplus$ operator is a nonparametric
+operation e.g. sum, mean, maximum or a recurrent neural network
+\cite[Chapter~5]{gnn_overview}.
+\newline
+
+Dealing with real world networks it is piratical to incorporate edge
+attributes in the GNN mechanism. For the attention type this is done with
+success in the original paper GAT \cite{gan_velickovic} and improved on in
+\cite{wsgat} by allowing signed weights through the attention coefficient.
+The computation of the attention coefficient is the following
+\begin{align}
+    a_{ij}^{k} = \text{sign}\left(e_{ij}  \right) \cdot
+    \text{softmax}_j\left(\text{abs}(e_{ij}^{k})\right),
+\end{align}
+where
+\begin{align}
+    e_{ij}^{k} = \text{MLP}^{k}\left(h_i^{k} \| h_j^{k} \| w_{ij}\right).
+\end{align}
+Here $w_ij$ is the weight of the edge, $\text{MLP}^{k}$ is a k-layer
+multilayer perceptron, where the last weight can produce negative values,
+$h_i^{k}$ and $h_j^{k}$ is the node feature embeddings after the $k$-th GNN
+layer. The input features are in the 0-th layer $h_i^{0} = x_i$.
+\subsection{AlphaZero}
+The section is a brief overview of how AlphaZero \cite{alphazero} works. The
+special thing about AlphaZero is that it uses purely reinforcement learning
+to optimize the policy and there is are is no outside data fed in. There are
+two separate phases for making the model work with purely
+reinforcement learning, in the one phase the model plays with itself and
+gathers information about the environment and gathers the data. In the second
+phase the information of the self play part is used to optimize the model and
+then AlphaZero plays with the optimized model against itself again, forming a
+loop \ref{fig: 5}.
+\begin{figure}[htb!]
+    \centering
+    \begin{tikzpicture}
+        \node[font=\bfseries] (0) {SelfPlay};
+        \node[right=of 0] (1) {$f_{\theta}(s) = (p, v)$};
+        \node[font=\bfseries, right= of 1] (2) {Train};
+
+        \draw[->, ultra thick] (0) to[out=90, in=90] node[midway, above]
+            {gather info} (2);
+        \draw[->, ultra thick] (2) to[out=270, in=270] node[midway, below]
+            {optimize} (0);
+    \end{tikzpicture}
+    \caption{AlphaZero cycle \label{fig: 5}}
+\end{figure}
+The optimization is done through the parameters $\theta$ of a deep neural
+network $f_\theta(s) = (p, v)$, which takes a state as input and outputs the
+transition probability vector $p_a = \mathbb{P}[a|s]$ for each action and a
+scalar value $v$, which estimates the outcome of position $s$, $v \simeq
+\mathbb{E}[r|s]$.
+In the self-play phase the model uses the MCTS algorithm to traverse down the
+MDP tree from the root node $s_0$. The key difference in the walk to a leaf
+node is that alpha zero incorporate the output of $f_\theta(s)$ in $UCB$
+formula, which can be expressed as follows
+\begin{align}
+    UCB = Q(s,a) + U(s,a),
+\end{align}
+where $Q(s,a)$ is the state-action value, and $U(s,a)\propto
+\frac{P(s,a)}{1+N(s,a)}$ a value dependent on the node visit count $N(s, a)$
+and probability $P(s, a)$ given by the deep neural network $f_\theta(s)$.
+Furthermore, AlphaZero does not utilize the third phase of the MCTS algorithm
+which randomly applies actions until reaching a terminal state. Instead, it
+just proceeds with the fourth phase of MCTS, of evaluating the current state
+and backpropagating to the root state. The architecture of $f_\theta$ is
+highly dependent on game/problem learned. Generally the first thing is state
+encoding, that is encoding the state in a usable way in AlphaGo
+Zero\cite{alphazero} the state is encoded in a $19x19x17$ array, instead of a
+simple $19x19$ board. The encoded state is passed residual neural network
+where the output is split into a value head neural network with zero-centered
+activation function to produce $v$ and a policy head neural network with
+softmax activation function to output $p$.
+[TODO: mb picture here for the architecture]
+
+\section{Application to Problem}
+The problem finding a path starting and ending at the same node with no
+repeated edges which minimizes the weights is an NP-hard because it is a case
+of a traveling salesman problem (TSV). As a first exploration step AlphaZero
+is applied on the problem. The underlying MDP is a deterministic one, since
+taking an action corresponds using an edge to get to the next node. The MDP
+has also with finite horizon, dependent on the graph size. The agent starts
+at a node $v_0$ corresponding, follows a policy to take actions/edges leading
+to the next node $v_1$ until forming a circuit $\left\{ v_0, v_1, \ldots, v_0
+\right\}$. The valid actions are edges from the current node $v_i$ that have
+not yet been traversed. The state could be the path the agent is currently
+taking, i.e. a sequence of nodes $s = \left\{ v_0,v_1,\ldots \right\}$. Upon
+arrival of the terminal state, which is either a circuit or a dead end the
+reward $R$ must be assigned correspondingly. It makes since to keep a track
+of the agents "score", such that the model will try to find the path with the
+highest score. The score should be higher based on the sum of the weights and
+the number of actions taken. . The agent should be punished with a negative
+reward upon ending up at a terminal state which is not the desired circuit,
+i.e. dead end. So the total reward will be combined from a global reward
+(winning or losing) and a local reward (weight minimization/score)
+\newline
+
+Steps have been taken in implementing the problem in python and applying the
+MCTS algorithm on the problem. The current difficulties aeries when trying to
+implement AlphaZero because of the state encoding. The state encoding in
+graph based problems needs to be done through GNNs, but the output also needs
+to consider valid moves which are the edges not traversed. Hence, it might
+make since to somehow encode the valid moves in the input through dynamic
+edges, i.e. removing edges. But will the removal of the edges even make since
+from a reinforcement learning perspective ? How should the input layer look
+like ?
+
+
+\nocite{alphazero}
+\nocite{mcts_chess}
+\nocite{ml_foundations}
+\nocite{mcts}
+\nocite{gan_velickovic}
+\nocite{gnn_overview}
+\nocite{wsgat}
+\nocite{rl_coopt}
+\nocite{routing_opt_rl_sl}
+\nocite{mcts_survey}
+\printbibliography
+
+\end{document}

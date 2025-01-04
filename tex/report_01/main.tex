@@ -1,0 +1,155 @@
+\include{./preamble.tex}
+
+
+\begin{document}
+
+\maketitle
+
+Note:\newline
+Formalization is garbage needs work.\newline
+Correctness of the optimization problem/s is not tested.\newline
+
+
+In decentralized finance (DeFi), on the blockchain, it is possible to exchange
+an amount of one token for another one, essentially giving a token its value.
+Generally these tokens are merely smart contracts, called ERC20 Smart
+Contracts, thus the name ERC20 Tokens. A wallet on the blockhain "has" a
+token, means that in the ERC20 smart contract of that token, there is stored
+database entry, which is a key and a value. The key represents the wallets
+address and the value is the amount of tokens the wallet has. Through
+interaction with the tokens smart contract, one can among other things send
+tokens to another address, or check how much tokens a specific wallet has.
+Trading tokens works through Automated Market Makers (AMMs), so called token
+pools, also smart contracts.
+\newline
+
+For example a pool which allows us to trade token X for token Y will have
+liquidity, meaning it will contain an amount of $r_X$ , $r_Y$ of token X and
+Y respectively, called reserves. A commonly used automated function market
+maker is the constant product function $r_Xr_Y = k$, enforced to be constant
+$k$ thought out a trade. If we are willing to trade $\Delta x$ of token X for
+token Y, $\Delta x$ will be added to the reserve of token X and the amount of
+token Y, $\Delta y$ we would get will be subtracted from the reserve of token
+Y. Through the trade it holds that $(r_X + \Delta x)(r_Y - \Delta y) = k$.
+And the amount $\Delta y$ of token $Y$ we would be getting can be calculated
+implicitly from the this formula, i.e. $(r_X + \Delta x)(r_Y - \Delta y) =
+r_Xr_Y$.
+\newline
+
+Example: $r_X = 100$, $r_Y = 50$, $\Delta x = 10$. In this case $r_Xr_Y = k =
+5000$, and the amount $\Delta y = r_Y - \frac{r_Xr_Y}{r_X + \Delta x} \simeq
+4.54$. Meaning we would be getting around $\Delta y = 4.54$ of tokens Y. The
+updated reserves $r_X = 110$ and $r_Y = 44.46$.
+\newline
+
+An interesting thing for the constant product market maker is that an
+infinite amount of tokens needs to be traded such that the reserve is
+drained, i.e. $\Delta y = \lim_{\Delta x\to\infty} y - \frac{k}{x + \Delta x}
+= y$. This enforces security of the pool and avoids pools being not usable.
+\newline
+
+In practice there is a protocol fee $1-\theta$ which is usually $0.3\%$. This
+fee is collected from every trade and added to the liquidity, supplying the
+liquidity providers. There is more things to explain here but not important
+right now, later for so called Just in time liquidity. In short, instead of
+trading the whole amount $\Delta x$ for $\Delta y$ as in the example above,
+only $\theta \Delta x $ is traded. Meaning in practice the trade is constant
+in the sence of $(r_X + \theta\Delta x)(r_Y - \Delta y) = r_Xr_Y$. And the
+amount $\phi(\delta x) = \Delta y = r_Y - \frac{r_Xr_Y}{r_X + \theta \Delta
+x}$ is received. Where $\phi: \mathbb{R}^{+} \to \mathbb{R}^{+}$ is the
+trading function. Then the reserves are updated according to the trade.
+Essentially the trade is conducted with $\Delta x$ with $\theta \Delta x$
+only being traded but the whole amount $\Delta x$ added to the liquidity.
+\newline
+
+For now lets focus on the feeless regime, however I would like to explore the
+calculations with the fee too.
+\newline
+
+The blockchain is constantly in motion each trade on a pool will alter the
+tokens price, and a user committing a transaction to trade a token is
+subjected to the quickness of the execution of the transaction to get a
+desirable swap. A highly likely scenario is that a swap will happen before
+the users transaction is executed (but committed), which will alter the
+price such that the user will receive only a fraction of the token. Hence a
+safety net is enforced called the slippage or slippage limit, which tells the
+trade transaction how much of a price impact the user is willing to tolerate
+to execute the trade. If the price change is more than the slippage limit,
+the trade will not be executed and the transaction will be reverted. Lets say
+a user commits a trade $\Delta x \in \mathbb{R}^{+}$ with slippage $\theta \in
+(0,1)$, another user commits the trade first for $\Delta x_B$. The first
+users trade will only be executed if $\phi(\Delta x_B + \Delta x) -
+\phi(\Delta x_B) \ge (1-\theta)\phi(\Delta x)$.
+\newline
+
+Consider a scenario where a user (victim) has committed a transaction to
+execute a trade, trading $\Delta x_V$ of Token X for Token Y with slippage
+limit $\theta$. Each swap will alter the price, meaning that an attacker is
+able commit a transaction to trade token X for token Y before the victim and
+right after sell the amount back for token X, making a profit. The attacker
+needs to maximize the amount $\Delta x_A$ tradable bound to the validity of
+the trade of the victim, i.e.
+\begin{align}
+    \max &\quad \Delta x_A \\
+    \text{s.t.:}&\quad \phi(\Delta x_V + \Delta x_A) - \phi(\Delta x_A) \ge
+    (1-\theta) \phi(\Delta x_V)\\
+        &\quad \Delta x_A \in \mathbb{R}^{+}
+\end{align}
+Q: What about with fees?\newline
+Q: What about gas/transaction fee?\newline
+Q: What about maximizing the profit?\newline
+Q: What about a profit condition?\newline
+Q: What about other CFMMs?
+Q: Slippage amount is not easily extractable from the information provided in
+the transaction data, how to get the correct slippage amount?
+Q: Propose a CFMM or a smart contract preventing this attack?
+\newline
+
+Next consider a arbitrage scenario. Tokens X and Y and two pools with
+reserves $r_{i, j}$, $i \in \{1, 2\}$ and $j\in \{X, Y\}$. In the constant
+motion of the blockchain the two pools may become in a state of unbalance,
+making the prices of the pools unequal. An arbitrageur exploiting this
+scenario will buy/sell from one pool and then sell/buy from the other pool.
+Let us say that the arbitrageur has detected that that the optimal trade is
+$X \to_{\text{Pool 1}} Y \to_{\text{Pool 2}} X$. Q: How to detect the
+arbitrage opportunity?. What is the maximal amount $\Delta x$ he can trade to
+get $\Delta x'$ out, maximizing the profit $\Delta x' - \Delta x$? The trades
+need to be subjected to the constant function market maker, essentially the
+constant product needs to be constant through out the trade in pool one and
+then through the trade in pool 2.
+\begin{align}
+    \max &\quad \Delta x' - \Delta x \\
+    \text{s.t.:}&\quad(r_{1,X} + \Delta x)(r_{1,Y} - \Delta y) =
+    r_{1,X}r_{1,Y} \\
+    &\quad(r_{2,X} - \Delta x')(r_{2,Y} + \Delta y) = r_{2,X}r_{2,Y},
+\end{align}
+where $\Delta y = r_{1,Y} - \frac{r_{1,X}r_{1,Y}}{r_{1,X} + \Delta
+x}$.\newline
+Q: How to find the arbitrage opportunity ? Graphs ? \newline
+Q: Is there a profit condition or only brute force ? \newline
+Q: Optimization with multiple pools $X\to Y \to Z \to \ldots \to X$ ? \newline
+Q: What is the optimal routing ? \newline
+Q: Other CFMMs ? \newline
+Q: With fees ? \newline
+Q: With transaction/gas fees ?
+
+On simple pools liquidity providers are bound to provide liquidity on the
+whole price curve $r_Xr_Y = k$. A newly adopted mechanic is to allow
+liquidity providers to provide liquidity on a specific price range. This
+makes the price impact after a trade different depending on how much
+liquidity is provided on this specific price range. Consider a scenario where
+a user (victim) is executing a large trade, an attacker sees this trade
+before its executed in the transaction pool and decides to provide liquidity
+before the trade of the victim is executed, and after the trade collecting it
+earning himself the majority of the fees.\newline
+
+Q: What is the optimal amount of liquidity to provide, formalization? \newline
+Q: Is there an upper bound on the profit, depending on the other liquidity
+providers ?
+
+
+
+
+
+
+\end{document}

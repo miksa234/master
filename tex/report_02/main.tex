@@ -1,0 +1,328 @@
+\include{./preamble.tex}
+
+\begin{document}
+
+\maketitle
+
+\section{Automated Market Makers}
+Decentralized finance (DeFI) consist of automated financial tools providing the
+ability, through smart contracts on the blockchain, to lend or borrow funds,
+trade crypto currencies and among others provide market liquidity earning
+an interest. The intermediary mechanism are Automated Market
+Makers (AMMs), which are governed by the Constant Function Market Maker
+(CFMM) trading function. CFMM describes the relation between the liquidity of
+two or more assets, but for simplicity sake consider for further on that we
+are only looking at a liquidity pools of only two assets. There are two
+options when interacting with a CFMM: providing liquidity and trading one
+asset for the other one or vice versa. Users who are providing liquidity are
+called liquidity providers (LPs) and users who are trading (or taking
+liquidity) are called liquidity takers (LTs). The interactions of these users
+with the CFMM are governed by two rules, the LT trading condition and the LP provision
+condition.
+\newline
+
+CFMM allows us to value two assets X and Y against each other, by initially
+providing a quantity $x \in \mathbb{R}_+$ of asset X and a quantity $y \in
+\mathbb{R}_{+}$ of asset Y as liquidity. The pair $(x,y)$ is called the
+reserves of the liquidity pool. The CFMM is a trading function of the
+reserves $f: \mathbb{R}_+^{2} \to \mathbb{R}_+$. A user is willing to
+exchange $\delta x$ of asset X through the CFMM. The amount $\delta
+y$ of asset $Y$ the user is going to receive is governed by the LT trading
+condition which requires the trading function to be constant throughout the
+trade. After the trade is executed the new reserves are updated to
+$(x+\delta x, y - \delta y)$, the amount $\delta y$ the user
+receives is determined implicitly through
+\begin{align}
+    f(x + \delta x, y - \delta y) = f(x, y) = k, \label{eq: 1}
+\end{align}
+where $k \in \mathbb{R}_+$ is a constant. The LT trading condition
+implies a level function $\phi_k(x) = y$, which is just $f(x,y) = k$
+rewritten. The user exchanging $\delta x$ will receive $\delta y = \delta x
+\cdot \tilde{Z}(\delta x)$, where $\tilde{Z}(\delta x)$ is the exchange rate
+of asset Y wrt. asset X. Rearranging gives
+\begin{align}
+    y - \delta y = \phi_k(x + \delta x) \implies \phi_k(x) - \delta
+    x\tilde{Z}(\delta x) = \phi (y + \delta y),
+\end{align}
+thereby the exchange rate is
+\begin{align}
+    \tilde{Z}(\delta x) = \frac{\phi_k(x) - \phi_k(x+\delta x)}{\delta x}.
+\end{align}
+We can also define the marginal exchange rate for a very small trade $\delta x$
+\begin{align}
+    Z = \lim_{\delta x \to 0} \frac{\phi_k(x) - \phi_k(x+\delta x)}{\delta x}
+    = -\phi_k'(\delta x), \label{eq: marginal exchange rate}
+\end{align}
+which can be taught of as the exchange rate without any execution cost. The
+execution cost is referred to as $|Z - \tilde{Z}(\delta x)|$.
+\newline
+Further more the condition $\delta x \cdot \tilde{Z}(\delta x) = \delta y$ defines an
+exchange function $F: \mathbb{R}_+ \to [0, y)$, where $F(\delta x) =
+\delta y$ bijectively satisfying the condition of the $\delta y$ for a given
+$\delta x$ in \ref{eq: 1}. Vice versa we can define also a reverse exchange
+function $G : [0, y) \to \mathbb{R}_+$, satisfying $G(\delta y) = \delta
+x$. These function are inverses of each other $F(G(\delta y)) = \delta x$ and
+$G(F(\delta x)) = \delta y$. Both functions can be solved for numerically
+through the relation in \ref{eq: 1}. The domain/image $[0, y)$ is a
+restriction, such that the reserves of the liquidity pool are not completely
+drained.
+\newline
+
+On the other hand the LP provision condition is the rule determining the LP
+transaction, where the user deposits or withdraws quantities $(\delta x,
+\delta y)$ of asset X and Y respectively from the liquidity pool. LP
+provision condition states that the marginal exchange rate $Z$ does not
+change before and after the transaction is executed. Let $k_1$ and $k_2$ be
+the depth constant of the pool before and after the transaction, satisfying
+\begin{align}
+    f(x, y) = k_1, \qquad f(x+\delta x, y+\delta y) = k_2,
+\end{align}
+with corresponding level functions $\phi_{k_1}$ and $\phi_{k_2}$. From the
+definition of the marginal exchange rate \ref{eq: marginal exchange rate} we
+deduce the LP provision condition to
+\begin{align}
+    -\phi'_{k_1}(x) = -\phi'_{k_2}(x + \delta x)
+\end{align}
+\newline
+
+The most commonly adopted CFMM is the Constant Product Market Maker. The
+trading function is $f(x, y) = xy$, the level function $\phi_k(x) =
+\frac{k}{x}$, the marginal exchange rate $Z = \frac{y}{x}$ and the forward
+and the reverse exchange functions are
+\begin{align}
+    &F(\delta x) = y\left(1-\frac{x}{x+\gamma \delta x}\right),\\
+    &G(\delta y) = \frac{x}{\gamma}\left(\frac{y}{y-\delta y} - 1\right),
+\end{align}
+where $(1-\gamma) \in (0,1)$ is the fee for the exchange associated with the
+pool. Usually this fee is $0.3\%$ but can vary from pool to pool. Trading
+$\delta x$ for $\delta y$, the pool would charge a $1-\gamma$ fee, essentially
+trading only $\gamma \delta x$ for $\delta y$ or vice versa. The fee is then
+split by liquidity providers, contributing to their reserves. Also notice
+that the forward exchange rate is convex and the reverse exchange rate is
+concave in this example, it is possible to prove this holds in general.
+\section{Frontrun Attack}
+A frontrun or sandwich attack is an exploit of a trade with large price
+impact on a AMM on the blockchain. It occurs when a victim commits a
+transaction simply trading $\delta x_V$ (a large amount wrt. the reserves) of
+asset X for $\delta y$ of asset Y on a pool with reserves $(x, y)$. Once the
+transaction is committed, but not yet executed by the block builders it lands
+in the transaction pool. The attacker identifies the transaction before it is
+executed and decides commit two transactions, sandwiching the victims
+transactions. The first transaction buys asset Y for asset X before the
+victim and the second transaction buys asset X for asset Y, occurring
+immediately after the victims trade. Decentralized exchanges allow the user
+to set a slippage limit $\eta \in (0, 1)$ which indicates how much of a price
+impact they are willing to tolerate before their transaction is executed. If
+the price impact is bigger than the indicated slippage limit the transaction
+will be reverted and the trade will not be executed. The
+aim is to maximize the attackers first trade amount wrt. the victims
+slippage limit.
+\subsection{Without fees}
+Modeling this problem without the $(1-\gamma) \in (0,1)$ fee collected for
+each trade buy the pool is simpler because the reserves are updated without
+having to incorporate the fee. The victim buys an amount $\delta x_V$ of
+asset X, buy the forward exchange function the user receives $\delta y =
+F(\delta x_V)$ for asset Y and is willing to tolerate only receiving
+$(1-\eta)F(\delta x_V)$. On the other hand the attacker executes a trade of
+$\delta x$ receiving $F(\delta x)$. The amount of asset Y received by the
+victim after the attackers trade is executed is $F(\delta x + \delta x_V) -
+F(\delta x)$. The victims trade will only be executed if
+\begin{align}
+    F(\delta x_V + \delta x) - F(\delta x) \le (1-\eta) F(\delta x_V).
+\end{align}
+Then we have the following optimization problem.
+\begin{align}
+    \max \quad  &\delta x \\
+    \text{s.t.:}\quad & F(\delta x_V + \delta x) - F(\delta x) \le (1-\eta)
+    F(\delta x_V) \\
+              & \delta x - x \le 0 \\
+              & F(\delta x) - y \le 0 \\
+              & \delta x > 0.
+\end{align}
+\subsection{With fees}
+With the pool fee the LT trading condition is $f(x+\gamma \delta x, y - \delta y) =
+k$, after the trade the reserves are updated to $(x, y) \mapsto (x + \delta x, y - \delta
+y)$. For the attackers trade the LT trading condition is governed by the
+initial depth constant of the pool $k_0$, meaning $f\left(x+\gamma \delta x,
+y - \delta y\right) = k_0$, after which the reserves are $(x', y') =
+(x+\delta x, y+\delta y)$. Following the attackers trade, the victims trade
+of $\delta x_V$ is executed under the condition $f(x' + \gamma \delta x_V, y'
+- \delta y_v) = k_1$. Where $k_1$ is the depth constant of the pool after the
+attackers trade. This means that the forward exchange rate at $k_0$ and $k_1$
+is different and dependent on the fee $(1-\gamma)$. Let us denote $F_{k_0}:
+\mathbb{R}_+ \to \mathbb{R}$ the forward exchange rate at $k_0$ and $F_{k_1}:
+\mathbb{R}_+ \times \mathbb{R}_+ \to \mathbb{R}$  the forward exchange rate
+at $k_1$. The forward exchange rate $F_{k_1}$ is a function of the victims
+input amount and the attackers input amount, which tells us how the reserves
+are updated, i.e. $F_{k_1}(\delta x_V, \delta x) = \delta y_V$. Under the slippage
+limit of the victim $\eta \in (0,1)$ the condition that the victims trade is
+executed is then
+\begin{align}
+    F_{k_1}(\delta x_V, \delta x) \le (1-\eta)F_{k_0}(\delta x_V).
+\end{align}
+This is the bound for the optimization problem. As an example for the CFMM
+$f(x,y) = k$, $F_{k_0}$ and $F_{k_1}$ are
+\begin{align}
+    &F_{k_0}(\delta x_V) = y \left(1-\frac{x}{x+\gamma \delta x_V}\right) \\
+    &F_{k_1}(\delta x_V, \delta x) = \left(y - F_{k_0}(\delta x)\right)
+    \left(1-\frac{x+\delta x}{x + \delta x +\gamma \delta x_V}\right)
+\end{align}
+\section{Arbitrage}
+The arbitrage opportunity/attack utilizes the lack of market price
+equilibrium of an asset to preform a sequence of trades on different AMMs to
+achieve a risk free profit. There are two challenges concerning this problem,
+first is finding the right sequence of AMMs on which the trades will be
+executed , and the second is to find the right trade amount that will
+maximize the profit. After the arbitrage is executed the market price of the
+asset wrt. the AMMs will be in an equilibrium.
+\subsection{Optimization Problem}
+First simply consider a two pool arbitrage (Pool 1, Pool 2) with the same
+CFMM trading function and same fee $(1-\gamma)\in (0,1)$, where two pools are
+both exchanging asset X for asset Y or vice versa. The reserves and the depth
+constants of the pools are $(x_1, y_1)$ and $(x_2, y_2)$, $k_1$ and $k_2$
+respectively. The marginal exchange rates for asset Y in terms of asset X in
+the two pools are $Z_1$ and $Z_2$. There is an arbitrage opportunity to trade
+$\delta x$ amount of asset X in Pool 1 for $\delta y$ amount of asset Y,
+trade $\delta y$ of asset Y in Pool 2 for $\delta x'$ of asset X, when $Z_1 <
+Z_2$. The equilibrium is achieved when $Z_1 = Z_2$. The goal is to maximize
+the profit $\delta x' - \delta x$ wrt. the LT trading conditions on both
+pools. The LT trading condition for the first trade is $f(x_1+\gamma \delta
+x, y_1 - \delta y) = k_1$ and for the second trade $f(x_2 - \delta x',
+y_2 + \gamma \delta y) = k_2$. Here $\delta y$ and $\delta x'$ can be calculated with the
+forward and reverse exchange functions, dependent on $\delta x$. The profit
+optimization then is
+\begin{align}
+    \max \quad &\delta x' - \delta x \\
+    \text{s.t.:}\quad &f(x_1+\gamma \delta x, y_1 - \delta y) = k_1\\
+             &f(x_2 - \delta x', y_2 + \gamma \delta y) = k_2\\
+             &\delta x > 0.
+\end{align}
+Generally the trading function is not affine linear hence this optimization
+problem is not convex. But in the case that the trading function is convex
+the relaxation of the problem, changing $=$ to $\le$ is a convex optimization
+problem and can be solved efficiently. Alternatively we could possibly
+reformulate the constraints wrt. the forward and reverse exchange function
+which are concave/convex functions and arrive together with a relaxation to a
+convex optimization problem. We would need to check if the relaxation is then
+at least quasi optimally solving the same problem.
+
+The general case of an arbitrage going through multiple AMMs is a circuit path
+\begin{align}
+    X_1 \xrightarrow{\text{Pool 1}} X_2 \xrightarrow{\text{Pool 2}}
+    \hdots \xrightarrow{\text{Pool n-1}} X_n \xrightarrow{\text{Pool n}} X_1,
+    \label{eq: path}
+\end{align}
+where the assets $\{X_1, \ldots, X_n\}$ are not necessarily unique, but the
+pools $\{\text{Pool 1},\ldots,\text{Pool n}\}$ are unique. Assume that the
+pools can only trade two assets. For all $i \in \{1,\ldots,n\}$ each Pool $i$
+allows trading of assets $X_i$ and $X_{i+1}$ with a fee of $(1-\gamma_i) \in
+(0,1)$. It has a LT trading condition with a CFMM $f_i:\mathbb{R}_+^{2}\to
+\mathbb{R}$, as arguments the reserves of the pool $x_i = (x_{i_1}, x_{i_2})$ and
+the initial depth constant of the pool is $f_i(x_{i_1}, x_{i_2}) = k_i$. The
+level function of the pool is $\phi^{i}_{k_i}(x_{i_2}) = x_{i_1}$ and its
+marginal exchange rate is $Z_i = -(\phi^{i}_{k_i})'(x_{i_2})$. The marginal
+exchange rate of Pool i, $Z_i$ is the marginal exchange rate of exchanging
+the asset associated with the reserve $x_{i_1}$ for the asset associated with
+the reserve $x_{i_2}$. W.l.o.g assume that arguments of the trading function,
+i.e. reserves $(x_{i_1}, x_{i_2})$, are sorted in the sense where a trade
+allways consists of exchanging an amount of asset associated with reserve $x_{i_1}$ for
+an amount of an asset associated with the reserve $x_{i_2}$.
+The arbitrage trade is sequentially conducting trades through all pools from
+asset $X_1$ back to asset $X_1$. In each pool a trade is executed set by a
+trade vector $\xi_i = (\xi_{i_1}, \xi_{i_2}) \in \mathbb{R}^{2}$, exchanging $\xi_{i_1}>0$ for
+$\xi_{i_2}<0$. At each pool the trade is bound by the LT trading condition
+$f_i(x_i+\xi_i) = f_i(x_i) = k_i$. The goal is to find the trade vectors
+$\xi_i$ that maximize the profit $\xi_{n_1} - \xi_{1_0}$, putting the market
+price at the equilibrium. The modeling leads us to the following optimization
+problem
+\begin{align}
+    \max \quad &\xi_{n_1} - \xi_{1_0} \\
+    \text{s.t.:}\quad &f_i(x_i+\xi_i) = f_i(x_i) \quad \quad \forall\;
+    i \in \{1,\ldots,n\}\\
+             &\xi_{1_0} > 0.
+\end{align}
+\subsection{Circuit Routing Problem}
+The challenging part in the arbitrage problem is finding the opportunity,
+i.e. finding the path in \ref{eq: path} in an extremely short amount of time.
+If thought of as a graph problem, the set of vertices $V$ are assets $\{X_1,
+\ldots, X_n\}$, and edges connecting them are pools $E = \{\text{Pool 1},
+\ldots, \text{Pool m}\}$, where each pool $k$ is represented by an edge
+$e_{ij}^{k}$ connecting asset $X_i$ with asset $X_j$. Each edge has a weight
+associated to it $w^{k}_{ij}$, which we set as
+\begin{align}
+    w_{ij}^{k} = -\log(Z_{ij}^{k}),
+\end{align}
+where $Z_{ij}^{k}$ is the marginal exchange rate of asset $X_j$ in reference
+to asset $X_i$ at pool $k$. Additionally note that the graph is a multigraph:
+a vertex can have multiple edges, one asset can share multiple pools. The aim
+is to find a path $C\subseteq E$ starting of an arbitrary length $l \le m$
+which starts and ends at a vertex $X_m$, $m\in\{1,\ldots,n\}$ with non
+repeating edges, which minimizes the weights. Basically a circuit minimal
+weight problem.
+\newline
+
+To solve this problem given the time constraints we can
+resort to using Monte-Carlo-Tree-Search (MCTS) based reinforcement learning.
+The first steps are to give a mathematical optimization model of the problem
+and translate it to a Markov-Decision-Process (MDP). Then create an
+appropriate Graph Neural Network (GNN), a message passing GNN (GMPPN) with
+appropriate encoders. Finally train the network through two pipelines, first the
+supervised learning pipeline which passes the parameters into reinforcement
+learning and MCTS pipeline, retraining the reward function.
+\newline
+
+The mathematical model of the problem is
+\begin{align}
+    \min \quad& \sum_{(i,j,k) \in E} \delta_{ij}^{k} w_{ij}^{k} \label{eq:
+    obj function}\\
+    \text{s.t.:}\quad & \delta_{ij}^{k} + \delta_{ji}^{k} \le 1 \quad \forall
+    (i,j,k) \in E, \label{eq: constraint 1} \\
+    & \sum_{j\in V, j\neq i} \delta^{k}_{ij} = \sum_{j \in V, j\neq i}
+    \delta^{k}_{ji} \quad \forall i \in V \label{eq: constraint 2} \\
+    & \text{3rd constarint: possibly subcycle elimination in the tour?}
+\end{align}
+where $\delta_{ij}^{k}$ is the binary decision variable, if $(i,j,k) \in C$
+then $\delta_{ij}^{k} = 1$ and 0 otherwise. Where \ref{eq: obj function} is
+the objective function, constraint in \ref{eq: constraint 1} esures that the
+edge $(i, j, k)$ is traversed only once. The constraint in \ref{eq:
+constraint 2} ensures flow conservation, for any vertex the number of
+incoming and outgoing edges must be equal.
+\newline
+
+As for the next steps I will have to get more familiar with MDPs, MCTS, GNNs...
+
+\section{Just in Time Liquidity}
+Just in Time Liquidity (JIT Liquidity), is an attack, where an attacker is
+also frontrunning a victims transaction. On contrast to the frontrun sandwich
+attack, the attacker actually gives the victim a worse exchange rate. Whereas
+JIT Liquidity actually provides the victim with a better exchange rate. In
+essence the attacker will execute a LP trade, lowering the victims exchange
+rate and immediately afterwards pull liquidity with another LP trade
+collecting the victims trading fees. While this form of attack can be done on
+AMMs described above, it is usually not profitable because all LP trades add
+liquidity on the whole price range, hence splitting the trading fees equally
+on all liquidity providers. The JIT liquidity attack is usually done on AMMs
+where the liquidity providers are able to provider liquidity on a specific
+price range $(Z_{i}, Z_{i+1}]$.
+\subsection{Concentrated Liquidity Markets}
+We will focus here on liquidity provision on CPMMs with concentrated
+liquidity (CL). In AMMs (pools) with CL the space of exchange rates (or only
+rates) where the LP provides liquidity is split into a set of values
+$\{Z_i\}_{i \in \mathbb{Z}}$, which are called ticks. Commonly used ticks are
+$Z_i = 1.0001^{i}$. Each tick range $(Z_i, Z_{i+1}]$ has an associated depth
+constant, which determines the LP trading condition when the marginal
+exchange rate $Z$ is in this interval.
+
+\section{TODO}
+The following are the obvious next steps:
+\begin{itemize}
+    \item Optimally conditions to the optimization problems
+    \item Solutions to the optimization problems
+    \item Equilibrium condition for general arbitrage with n pools
+    \item Derive MDP for circuit problem
+    \item MCTS reinforcement learning for the circuit problem (big)
+    \item JIT Liquidity further formalization, together with concentrated
+        liquidity AMMs and optimization problem.
+\end{itemize}
+
+\end{document}

@@ -1,0 +1,110 @@
+\documentclass[fleqn]{beamer}
+\beamertemplatenavigationsymbolsempty
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{mathptmx}
+\usepackage{subcaption}
+\usepackage{amsthm}
+\usepackage{tikz}
+%\usepackage[colorlinks=true,naturalnames=true,plainpages=false,pdfpagelabels=true]{hyperref}
+\usetikzlibrary{patterns,decorations.pathmorphing,positioning, arrows, chains}
+
+\usepackage[backend=biber, sorting=none]{biblatex}
+\addbibresource{uni.bib}
+
+\setbeamertemplate{endpage}{%
+    \begin{frame}
+        \centering
+%        \Large \emph{To be continued\ldots}
+
+%        \vspace{1cm}
+
+        \centering
+        \Large \emph{Thank You!}
+    \end{frame}
+}
+
+\AtEndDocument{\usebeamertemplate{endpage}}
+
+% vertical separator macro
+\newcommand{\vsep}{
+  \column{0.0\textwidth}
+    \begin{tikzpicture}
+      \draw[very thick,black!10] (0,0) -- (0,7.3);
+    \end{tikzpicture}
+}
+\setlength{\mathindent}{0pt}
+
+% Beamer theme
+\usetheme{UniVienna}
+\usefonttheme[onlysmall]{structurebold}
+\mode<presentation>
+\setbeamercovered{transparent=10}
+
+\title
+{MEV (Maxmial Extractable Value) Challanges}
+\author[]{}
+\date{November 11, 2024}
+
+\begin{document}
+    \begin{frame}
+        \titlepage
+    \end{frame}
+
+    \begin{frame}{Blockchain: Example Ethereum}
+        \begin{figure}[htpb]
+            \centering
+            \includegraphics[width=1\textwidth]{./pics/eth_basic.png}
+        \end{figure}
+    \end{frame}
+
+    \begin{frame}{Blockchain: Transaction Pool}
+        \begin{figure}[htpb]
+            \centering
+            \includegraphics[width=0.7\textwidth]{./pics/tx_pool.png}
+        \end{figure}
+    \end{frame}
+
+    \begin{frame}{What is MEV?}
+        \begin{figure}[htpb]
+            \centering
+            \includegraphics[width=1\textwidth]{./pics/mev.png}
+        \end{figure}
+    \end{frame}
+
+
+    \begin{frame}{Decentralized Exchange (DEX)}
+        \begin{figure}[htpb]
+            \centering
+            \includegraphics[width=1\textwidth]{./pics/amms_dex.jpg}
+        \end{figure}
+    \end{frame}
+
+    \begin{frame}{Constant Function Market Maker (CFMM)}
+        \begin{figure}[htpb]
+            \centering
+            \includegraphics[width=1\textwidth]{./pics/amms.png}
+        \end{figure}
+    \end{frame}
+
+
+    \begin{frame}{Sandwich MEV}
+        \begin{figure}[htpb]
+            \centering
+            \includegraphics[width=0.9\textwidth]{./pics/mev_sandwich.png}
+        \end{figure}
+    \end{frame}
+
+    \begin{frame}{Arbitrage MEV}
+        \begin{figure}[htpb]
+            \centering
+            \includegraphics[width=1\textwidth]{./pics/mev_arbitrage.png}
+        \end{figure}
+    \end{frame}
+
+
+\end{document}

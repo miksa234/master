@@ -1,0 +1,288 @@
+\documentclass[a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{mlmodern}
+
+%\usepackage{ngerman}	% Sprachanpassung Deutsch
+
+\usepackage{graphicx}
+\usepackage{geometry}
+\geometry{a4paper, top=15mm}
+
+\usepackage{subcaption}
+\usepackage[shortlabels]{enumitem}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{braket}
+\usepackage{bbm}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{yhmath}
+\usepackage{tikz}
+\usepackage{scratch}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usetikzlibrary{patterns,decorations.pathmorphing,positioning}
+\usetikzlibrary{calc,decorations.markings, shapes.geometric}
+
+\usepackage[backend=biber, sorting=none]{biblatex}
+\addbibresource{cite.bib}
+
+\usepackage[framemethod=TikZ]{mdframed}
+
+\tikzstyle{titlered} =
+    [draw=black, thick, fill=white,%
+        text=black, rectangle,
+        right, minimum height=.7cm]
+
+
+\usepackage[colorlinks=true,naturalnames=true,plainpages=false,pdfpagelabels=true]{hyperref}
+\usepackage[parfill]{parskip}
+\usepackage{lipsum}
+
+\usepackage[most]{tcolorbox}
+\tcbuselibrary{skins,breakable}
+\pagestyle{myheadings}
+\colorlet{colexam}{black}
+\numberwithin{equation}{subsection}
+
+\newcounter{definition}
+\newtcolorbox[use counter=definition, number within=subsection]{definition}[1][]{
+    empty,
+    title={\textbf{Definition~\thetcbcounter} \textit{#1}},
+    attach boxed title to top left,
+    fontupper=\sl,
+    boxed title style={
+        empty,
+        size=minimal,
+        bottomrule=1pt,
+        top=1pt,
+        left skip=0cm,
+        overlay=
+            {\draw[colexam,line width=1pt]([yshift=-0.35cm]frame.north
+        west)--([yshift=-0.35cm]frame.north east);}},
+            coltitle=colexam,
+            fonttitle=\normalfont,
+            before=\par\medskip\noindent,
+            parbox=false,
+            boxsep=-1pt,
+            left=0.75cm,
+            right=3mm,
+            top=4pt,
+            breakable,
+            pad at break*=0mm,
+            vfill before first,
+            overlay unbroken={
+                \draw[colexam,line width=1pt]
+                ([xshift=0.6cm, yshift=-0.5pt]frame.south
+                west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
+                --([xshift=0.6cm]frame.south west)--([xshift=-13cm]frame.south east); },
+            overlay first={
+                \draw[colexam,line width=1pt]
+                ([xshift=0.6cm, yshift=-0.5pt]frame.south
+                west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
+                --([xshift=0.6cm]frame.south west); },
+            overlay last={
+                \draw[colexam,line width=1pt]
+                ([xshift=0.6cm, yshift=-0.5pt]frame.south
+                west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
+                --([xshift=0.6cm]frame.south west)--([xshift=-13cm]frame.south east); }
+}
+
+\newcounter{theorem}
+\newtcolorbox[use counter=theorem, number within=subsection]{theorem}[1][]{
+    empty,
+    title={\textbf{Theorem~\thetcbcounter} \textit{#1}},
+    attach boxed title to top left,
+    fontupper=\sl,
+    boxed title style={
+        empty,
+        size=minimal,
+        bottomrule=1pt,
+        top=1pt,
+        left skip=0cm,
+        overlay=
+            {\draw[colexam,line width=1pt]([yshift=-0.35cm]frame.north
+        west)--([yshift=-0.35cm]frame.north east);}},
+            coltitle=colexam,
+            fonttitle=\normalfont,
+            before=\par\medskip\noindent,
+            parbox=false,
+            boxsep=-1pt,
+            left=0.75cm,
+            right=3mm,
+            top=4pt,
+            breakable,
+            pad at break*=0mm,
+            vfill before first,
+            overlay unbroken={
+                \draw[colexam,line width=1pt]
+                ([xshift=0.6cm, yshift=-0.5pt]frame.south
+                west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
+                --([xshift=0.6cm]frame.south west)--([xshift=-13cm]frame.south east); },
+            overlay first={
+                \draw[colexam,line width=1pt]
+                ([xshift=0.6cm, yshift=-0.5pt]frame.south
+                west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
+                --([xshift=0.6cm]frame.south west); },
+            overlay last={
+                \draw[colexam,line width=1pt]
+                ([xshift=0.6cm, yshift=-0.5pt]frame.south
+                west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
+                --([xshift=0.6cm]frame.south west)--([xshift=-13cm]frame.south east); }
+}
+\newcounter{lemma}
+\newtcolorbox[use counter=lemma, number within=subsection]{lemma}{
+    empty,
+    title={Lemma~\thetcbcounter},
+    attach boxed title to top left,
+    fontupper=\sl,
+    boxed title style={
+        empty,
+        size=minimal,
+        bottomrule=1pt,
+        top=1pt,
+        left skip=0cm,
+        overlay=
+            {\draw[colexam,line width=1pt]([yshift=-0.35cm]frame.north
+        west)--([yshift=-0.35cm]frame.north east);}},
+            coltitle=colexam,
+            fonttitle=\bfseries,
+            before=\par\medskip\noindent,
+            parbox=false,
+            boxsep=-1pt,
+            left=0.75cm,
+            right=3mm,
+            top=4pt,
+            breakable,
+            pad at break*=0mm,
+            vfill before first,
+            overlay unbroken={
+                \draw[colexam,line width=1pt]
+                ([xshift=0.6cm, yshift=-0.5pt]frame.south
+                west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
+                --([xshift=0.6cm]frame.south west)--([xshift=-13cm]frame.south east); },
+            overlay first={
+                \draw[colexam,line width=1pt]
+                ([xshift=0.6cm, yshift=-0.5pt]frame.south
+                west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
+                --([xshift=0.6cm]frame.south west); },
+            overlay last={
+                \draw[colexam,line width=1pt]
+                ([xshift=0.6cm, yshift=-0.5pt]frame.south
+                west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
+                --([xshift=0.6cm]frame.south west)--([xshift=-13cm]frame.south east); }
+}
+\newcounter{proposition}
+\newtcolorbox[use counter=proposition, number within=subsection]{proposition}{
+    empty,
+    title={\textbf{Proposition~\thetcbcounter}},
+    attach boxed title to top left,
+    fontupper=\sl,
+    boxed title style={
+        empty,
+        size=minimal,
+        bottomrule=1pt,
+        top=1pt,
+        left skip=0cm,
+        overlay=
+            {\draw[colexam,line width=1pt]([yshift=-0.4cm]frame.north
+        west)--([yshift=-0.4cm]frame.north east);}},
+            coltitle=colexam,
+            fonttitle=\normalfont,
+            before=\par\medskip\noindent,
+            parbox=false,
+            boxsep=-1pt,
+            left=0.75cm,
+            right=3mm,
+            top=4pt,
+            breakable,
+            pad at break*=0mm,
+            vfill before first,
+            overlay unbroken={
+                \draw[colexam,line width=1pt]
+                ([xshift=0.6cm, yshift=-0.5pt]frame.south
+                west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
+                --([xshift=0.6cm]frame.south west)--([xshift=-13cm]frame.south east); },
+            overlay first={
+                \draw[colexam,line width=1pt]
+                ([xshift=0.6cm, yshift=-0.5pt]frame.south
+                west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
+                --([xshift=0.6cm]frame.south west); },
+            overlay last={
+                \draw[colexam,line width=1pt]
+                ([xshift=0.6cm, yshift=-0.5pt]frame.south
+                west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
+                --([xshift=0.6cm]frame.south west)--([xshift=-13cm]frame.south east); }
+}
+\newcounter{myproof}
+\newtcolorbox[]{myproof}[1]{
+    empty,
+    title={\textbf{Proof}~\textit{#1}},
+    attach boxed title to top left,
+    fontupper=\sl,
+    boxed title style={
+        empty,
+        size=minimal,
+        bottomrule=1pt,
+        top=1pt,
+        left skip=0cm,
+        overlay=
+            {\draw[colexam,line width=1pt]([yshift=-0.35cm]frame.north
+        west)--([yshift=-0.35cm]frame.north east);}},
+            coltitle=colexam,
+            fonttitle=\normalfont,
+            before=\par\medskip\noindent,
+            parbox=false,
+            boxsep=-1pt,
+            left=0.75cm,
+            right=3mm,
+            top=4pt,
+            breakable,
+            pad at break*=0mm,
+            vfill before first,
+            overlay unbroken={
+                \draw[colexam,line width=1pt]
+                ([xshift=0.6cm, yshift=-0.5pt]frame.south
+                west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
+                --([xshift=0.6cm]frame.south west)--([xshift=-13cm]frame.south east); },
+            overlay first={
+                \draw[colexam,line width=1pt]
+                ([xshift=0.6cm, yshift=-0.5pt]frame.south
+                west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
+                --([xshift=0.6cm]frame.south west); },
+            overlay last={
+                \draw[colexam,line width=1pt]
+                ([xshift=0.6cm, yshift=-0.5pt]frame.south
+                west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
+                --([xshift=0.6cm]frame.south west)--([xshift=-13cm]frame.south east);
+                \draw[colexam,line width=0.5pt]
+                ([xshift=-1.5cm,yshift=0.5cm]frame.south east)
+                --([xshift=-1.25cm, yshift=0.5cm]frame.south east)
+                --([xshift=-1.25cm, yshift=0.25cm]frame.south east)
+                --([xshift=-1.5cm, yshift=0.25cm]frame.south east)
+                --([xshift=-1.5cm, yshift=0.5cm]frame.south east);
+            }
+}
+
+\newcommand{\eps}{\varepsilon}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\usepackage[OT2,T1]{fontenc}
+\DeclareSymbolFont{cyrletters}{OT2}{wncyr}{m}{n}
+\DeclareMathSymbol{\Sha}{\mathalpha}{cyrletters}{"58}
+
+\markright{Popović}
+
+
+\title{
+    MEV \& Constant Function Market Makers\\
+    Report 3
+}
+\author{Milutin Popovic}
+\date{}
+
