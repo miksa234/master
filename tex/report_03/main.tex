@@ -323,38 +323,34 @@ the nodes.
         \node[align=center, ellipse, draw, ultra thick] (0)  {Start};
 
         \node[align=center, draw, ultra thick, below=of 0] (1)
-            {current state $s_0$};
+            {$s_0$};
 
         \node[align=center, draw, ultra thick, below=of 1] (2)
-            {is current state\\ a leaf node?};
+            {are we at\\ a leaf node?};
 
         \node[align=center, draw, ultra thick, below=of 2] (3)
-            {current state = child node \\
-            that maximizes $UCB1(s_k)$?};
+            {move to child\\ with best UCB};
 
-        \node[align=center, draw, ultra thick, right=2cm of 2] (4)
-            {Was the current state\\ visited before ($n_k > 0$)};
+        \node[align=center, draw, ultra thick, right=1.5cm of 2] (4)
+            {was the current state\\ visited before ?};
 
-        \node[align=center, ellipse, draw, ultra thick, above=of 4] (5)
+        \node[align=center, ellipse, draw, ultra thick, right=1.5cm of 4] (5)
             {Roll-out};
 
         \node[align=center, draw, ultra thick, below=of 4] (6)
-            {
-                add a new state to the tree \\
-                for each available action
-            };
+            {expand tree for\\each available action};
 
         \node[align=center, draw, ultra thick, below=of 6] (7)
-            {current state = first new child node};
+            {new child state};
 
-        \node[align=center, draw, ultra thick, below=of 7] (8)
+        \node[align=center,ellipse, draw, ultra thick, below=of 7] (8)
             {Roll-out};
 
         \draw[->, ultra thick] (0) to (1);
         \draw[->, ultra thick] (1) to (2);
         \draw[->, ultra thick] (2) to node[midway, right] {NO} (3);
         \draw[->, ultra thick] (2) to node[midway, above] {YES} (4);
-        \draw[->, ultra thick] (4) to node[midway, right] {YES} (5);
+        \draw[->, ultra thick] (4) to node[midway, above] {YES} (5);
         \draw[->, ultra thick] (4) to node[midway, right] {NO} (6);
         \draw[->, ultra thick] (6) to (7);
         \draw[->, ultra thick] (7) to (8);
@@ -390,7 +386,7 @@ algorithm returns then the  action $a$ leading to the best child of $s_0$.
 The number of search iterations is usually indicated by a specific search
 time or number of search steps given and is denoted by the while statement.
 
-\subsection{Graph Neural Networks}
+\subsection{Graph Neural Networks \label{sec: gnn}}
 This section is an introductory the Graph Neural Networks (GNNs)
 \cite{gnn_overview}. GNNs are Neural Networks (NNs) which operate over graph
 structured data. Let further denote a graph as a tuple $(E, V)$, where $E$
@@ -512,7 +508,7 @@ fixed weights $c_{ij}$ after applying some function $\psi$ on them
 
 In attention type \cite{gan_velickovic} features of neighbors are applied
 with implicit weights, via attention. The attention coefficient for each
-pair is computed via a function $a_{ij} = a(x_i, x_j)$, usually a
+pair is computed via a function $\alpha_{ij} = a(x_i, x_j)$, usually a
 softmax function resulting in
 \begin{align}
     x_i' = g\left( x_i, \bigoplus_{j\in \mathcal{N}_i} a(x_i, x_j) \psi(x_j) \right).
@@ -537,17 +533,23 @@ success in the original paper GAT \cite{gan_velickovic} and improved on in
 \cite{wsgat} by allowing signed weights through the attention coefficient.
 The computation of the attention coefficient is the following
 \begin{align}
-    a_{ij}^{k} = \text{sign}\left(e_{ij}  \right) \cdot
-    \text{softmax}_j\left(\text{abs}(e_{ij}^{k})\right),
+    \alpha_{ij}^{(k)} = \text{sign}\left(e_{ij}  \right) \cdot
+    \text{softmax}_j\left(\text{abs}(e_{ij}^{(k)})\right),
 \end{align}
 where
 \begin{align}
-    e_{ij}^{k} = \text{MLP}^{k}\left(h_i^{k} \| h_j^{k} \| w_{ij}\right).
+    e_{ij}^{(k)} = \text{MLP}^{k}\left(h_i^{(k)} \| h_j^{(k)} \| w_{ij}\right).
 \end{align}
-Here $w_ij$ is the weight of the edge, $\text{MLP}^{k}$ is a k-layer
-multilayer perceptron, where the last weight can produce negative values,
-$h_i^{k}$ and $h_j^{k}$ is the node feature embeddings after the $k$-th GNN
-layer. The input features are in the 0-th layer $h_i^{0} = x_i$.
+Here $\|$ is the concatenation operator,  $w_{ij}$ is the weight
+of the edge, $\text{MLP}^{k}$ is a $k$-th layer multilayer perceptron, where
+the last weight can produce negative values, $h_i^{(k)}$ and $h_j^{(k)}$ is
+the node feature embeddings after the $k$-th GNN layer. The input features
+are in the 0-th layer $h_i^{(0)} = x_i$. Then the node embedding for the next
+layer is calculated by
+\begin{align}
+    h_{i}^{(k+1)} = g\left( h_i^{(k)},
+    \bigoplus_{j\in\mathcal{N}_i}\alpha_{ij}^{(k)}h_j^{(k)} \right)
+\end{align}
 \subsection{AlphaZero}
 The section is a brief overview of how AlphaZero \cite{alphazero} works. The
 special thing about AlphaZero is that it uses purely reinforcement learning
@@ -613,7 +615,7 @@ to the next node $v_1$ until forming a circuit $\left\{ v_0, v_1, \ldots, v_0
 not yet been traversed. The state could be the path the agent is currently
 taking, i.e. a sequence of nodes $s = \left\{ v_0,v_1,\ldots \right\}$. Upon
 arrival of the terminal state, which is either a circuit or a dead end the
-reward $R$ must be assigned correspondingly. It makes since to keep a track
+reward $R$ must be assigned correspondingly. It makes sence to keep a track
 of the agents "score", such that the model will try to find the path with the
 highest score. The score should be higher based on the sum of the weights and
 the number of actions taken. . The agent should be punished with a negative
@@ -627,11 +629,22 @@ MCTS algorithm on the problem. The current difficulties aeries when trying to
 implement AlphaZero because of the state encoding. The state encoding in
 graph based problems needs to be done through GNNs, but the output also needs
 to consider valid moves which are the edges not traversed. Hence, it might
-make since to somehow encode the valid moves in the input through dynamic
+make sense to somehow encode the valid moves in the input through dynamic
 edges, i.e. removing edges. This is implemented in \cite{rl_coopt} by
 masking, and with encoder-decoder layer. But will the removal of the edges
-even make since from a reinforcement learning perspective ? How should the
+even make, since from a reinforcement learning perspective ? How should the
 input layer look like ? The code can be found in \cite{github}.
+\newline
+
+To construct the encoded input it is useful to pass information about the
+weights, edges visits, node/edge embeddings and current node/state. For the
+weights, a weighted adjacency matrix of the graph can be used. For the edge
+visits a binary matrix of the size of the adjacency matrix can be used, where
+$1$ indicates the edge as visited and $0$ as unvisited. And the node/edge
+embeddings a variation of methods described in section \ref{sec: gnn} can be
+used. Lastly, as an indicator for the current node position the agent is in.
+Similarly like in AlphaGo Zero, the information of the previous couple of
+states can be concatenated together to get a promising input.
 
 
 \nocite{alphazero}
