@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 
+from .config import DEVICE
 from torch import nn
 from torch.nn import functional as F
 
 class ResNet(nn.Module):
-    def __init__(self, game, num_res_blocks, num_hidden):
+    def __init__(self, game, gnn, num_res_blocks, num_hidden):
         super().__init__()
+
+        self.gnn = gnn
+        self.game = game
+
         self.start_block = nn.Sequential(
             nn.Conv2d(4, num_hidden, kernel_size=3, padding=1),
             nn.BatchNorm2d(num_hidden),
@@ -33,7 +38,9 @@ class ResNet(nn.Module):
             nn.Tanh()
         )
 
-    def forward(self, x):
+    def forward(self, state, node_attr, edge_index, edge_attr):
+        node_emb = self.gnn(node_attr, edge_index, edge_attr).squeeze(1)
+        x = self.game.encode_state(state, node_emb)
         x = self.start_block(x)
         for res_block in self.back_bone:
             x = res_block(x)

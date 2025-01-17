@@ -12,6 +12,8 @@ class NetGame:
         self.edges = {(i, j): w['weight'] for i, j, w in G.edges(data=True)}
         self.nodes = list(G.nodes)
         self.adj_matrix = nx.adjacency_matrix(G).toarray()
+        self.data = self.get_net_data().to(DEVICE)
+        self.node_emb = self.data.x
 
     def get_next_state(self, state, action):
         # state is a set of nodes, last one where we are
@@ -77,7 +79,7 @@ class NetGame:
 
         embeddings = node_emb.unsqueeze(1).repeat(1, 1 , len(self.nodes))
 
-        current_node = torch.tensor(state[-1]).unsqueeze(0).repeat(1, len(self.nodes), len(self.nodes)).to(DEVICE)
+        current_node = state[-1].unsqueeze(0).repeat(1, len(self.nodes), len(self.nodes))
 
         return torch.cat([A, V, embeddings, current_node], dim=0).float().unsqueeze(0)
 
@@ -85,6 +87,6 @@ class NetGame:
         valid_nodes = [i for _, i in self.get_valid_actions(state)]
         mask = [i for i in range(len(self.nodes)) if i not in valid_nodes]
         policy[mask] = 0
-        policy = torch.tensor([val for val in policy if val != 0]).to(DEVICE)
-        return policy
+        policy.to(DEVICE)
+        return policy / policy.sum()
 

@@ -4,25 +4,53 @@ from .game import NetGame
 from .config import DEVICE
 from .mcts import MCTS
 from .resnet import ResNet
-#from .gnn import GNN
 
 import networkx as nx
+import pandas as pd
 import numpy as np
 import torch
 from torch_geometric.data import Data
 from torch_geometric.nn import GATConv
 
+
 def run():
-    G = nx.fast_gnp_random_graph(6, 1, seed=1)
+    pools = pd.read_csv(
+        'data/cached-pools.csv',
+        index_col=0,
+        names=[
+            "index", "addess", "version",
+             "token0", "token1", "fee", "block_number",
+             "timestamp", "tickspacing"
+       ]
+    ).sort_index()
+
+    G = nx.from_edgelist(list(tuple(zip(pools['token0'], pools['token1']))))
+    for _ in range(10):
+        remove = [node for (node, d) in dict(G.degree()).items() if d <= 10]
+        G.remove_nodes_from(remove)
+
+
+    mapping = {}
+    for i, node in enumerate(list(G.nodes())):
+        mapping[node] = i
+    G = nx.relabel_nodes(G, mapping)
     for _, _, w in G.edges(data=True):
         w['weight'] = round(np.random.uniform(0.7, 1.4), 4)
+
+#    G = nx.fast_gnp_random_graph(100, 1, seed=1)
+#    for _, _, w in G.edges(data=True):
+#        w['weight'] = round(np.random.uniform(0.7, 1.4), 4)
 
 
     ## Just scramble code to test if shit works
 
+    args = {
+        'C': 2,
+        'num_searches': 1000
+    }
+
     game = NetGame(G)
-    model = ResNet(game, 4, 64).to(DEVICE)
-    gat_layer = GATConv(
+    gnn = GATConv(
         in_channels=1,
         out_channels=1,
         heads=1,
@@ -35,68 +63,30 @@ def run():
         bias=False,
         residual=False
     ).to(DEVICE)
+    model = ResNet(game, gnn, 4, 64).to(DEVICE)
+    model.eval()
+
+    mcts = MCTS(game, args, model)
 
     data = game.get_net_data().to(DEVICE)
-    node_embeddings = gat_layer(data.x, data.edge_index, data.edge_attr).squeeze(1)
 
     state = [0]
-    valid_actions = game.get_valid_actions(state)
-    action_index = 0
-    action = valid_actions[action_index]
-    state = game.get_next_state(state, action)
+    while True:
+        print(state)
+        valid_actions = game.get_valid_actions(state)
+        mcts_probs = mcts.search(state)
+        action = valid_actions[np.argmax(mcts_probs)]
+        state = game.get_next_state(state, action)
 
-    print(state)
-
-    value, terminated = game.get_value_and_terminated(state)
-
-    x = game.encode_state(state, node_embeddings).to(DEVICE)
-
-    value, policy = model(x)
-    policy = torch.softmax(game.mask_policy(policy.squeeze(0), state), dim=0)
-
-    print(policy)
-    print(value)
+        value, is_terminal = game.get_value_and_terminated(state)
 
 
-
-#    args = {'C': 1.41, 'num_searches': 1000}
-#    mcts = MCTS(game, args)
-#
-#
-#    while True:
-#        valid_actions = game.get_valid_actions(state)
-#        if len(valid_actions) == 0:
-#            print("LOSS")
-#            break
-#
-#        print("valid_actions", [(f"index {i}", j) for i, (_, j) in enumerate(valid_actions)])
-#
-#        action_probs = mcts.search(state)
-#        action_index = np.argmax(action_probs)
-#        action = valid_actions[action_index]
-#
-#
-#        state = game.get_next_state(state, action)
-#
-#        value, terminated = game.get_value_and_terminated(state)
-#
-#        print(value, state)
-#
-#        if terminated == True:
-#            if state[0] == state[-1]:
-#                print("WON")
-#            else:
-#                print("LOSS")
-#            break
-#
-#        print(state)
-
-
-
-
-
-
-
-
-
-
+        if is_terminal:
+            print(state)
+            if game.check_win(state):
+                print('WON')
+                print(value)
+            else:
+                print('LOSS')
+                print(value)
+            break
