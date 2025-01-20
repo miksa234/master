@@ -4,8 +4,11 @@ from .config import DEVICE
 import numpy as np
 import torch
 
+import logging
+logger = logging.getLogger('rl_circuit')
+
 class Node:
-    def __init__(self, game, args, state, parent=None, action_taken=None, prior=0):
+    def __init__(self, game, args, state, parent=None, action_taken=None, prior=0, visit_count=0):
         self.args = args
         self.state = state
         self.parent = parent
@@ -14,7 +17,7 @@ class Node:
         self.children = []
         self.expandable_actions = game.get_valid_actions(state)
 
-        self.visit_count = 0
+        self.visit_count = visit_count
         self.value_sum = 0
 
         self.prior = prior
@@ -22,7 +25,7 @@ class Node:
     def is_fully_expanded(self):
         # node is fully expanded if there are no valid moves
         # node is fully expanded if there are children
-        return len(self.expandable_actions) == 0 and len(self.children) > 0
+        return len(self.children) > 0
 
     def select(self, ucb_method='alphazero'):
         # calculate ucb for all children
@@ -57,6 +60,7 @@ class Node:
     def expand(self, game):
         action_index = np.random.choice(range(len(self.expandable_actions)))
         action = self.expandable_actions[action_index]
+
         self.expandable_actions.pop(action_index)
 
         child_state = self.state.copy()
@@ -74,7 +78,6 @@ class Node:
 
                 child = Node(game, self.args, child_state, self, (self.state[-1], action), prob)
                 self.children.append(child)
-        return child
 
     def simulate(self, game):
         value, is_terminal = game.get_value_and_terminated(self.state)
@@ -109,19 +112,38 @@ class MCTS:
 
     @torch.no_grad()
     def search(self, state):
-        root = Node(self.game, self.args, state)
+        root = Node(self.game, self.args, state, visit_count=1)
 
-        for search in range(self.args['num_searches']):
+        _, policy = self.model(
+            self.game.encode_state(root.state, root.state[-1]),
+            self.game.data.x,
+            self.game.data.edge_index,
+            self.game.data.edge_attr
+        )
+        policy = torch.softmax(policy.squeeze(0), dim=0).detach().cpu().numpy()
+
+        # dirichlet random noise
+        policy = (1-self.args['eps']) * policy \
+            + self.args['eps'] * np.random.dirichlet([self.args['dirichlet_alpha']]) * np.ones(policy.shape)
+        policy = self.game.mask_policy(policy, root.state)
+
+        action = [root.state[-1], np.random.choice(self.game.nodes, p=policy)]
+
+
+        root.expand_alphazero(policy, self.game)
+
+        for s in range(self.args['num_searches']):
             node = root
             # selection
             while node.is_fully_expanded():
                 node = node.select()
 
+
             value, is_terminal = self.game.get_value_and_terminated(node.state)
             if not is_terminal:
                 value, policy = self.model(
-                    torch.tensor(node.state).to(DEVICE),
-                    self.game.node_emb,
+                    self.game.encode_state(node.state, node.state[-1]),
+                    self.game.data.x,
                     self.game.data.edge_index,
                     self.game.data.edge_attr
                 )
@@ -131,7 +153,7 @@ class MCTS:
                 value = value.item()
 
                 # expansion
-                node = node.expand_alphazero(policy, self.game)
+                node.expand_alphazero(policy, self.game)
 
                 # simulation not needed for AlphaZero
                 # node = node.expand()
@@ -144,9 +166,9 @@ class MCTS:
 
         # return visit_count distribution
         valid_actions = self.game.get_valid_actions(state)
-        action_probs = np.zeros(len(valid_actions))
+        action_probs = np.zeros(len(self.game.nodes))
         for child in root.children:
-            action_probs[valid_actions.index(child.action_taken)] = child.visit_count
+            action_probs[child.action_taken[1]] = child.visit_count
 
         action_probs /= np.sum(action_probs)
         return action_probs

@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 
 from .config import DEVICE
+
+import torch
 from torch import nn
 from torch.nn import functional as F
+
+import logging
+logger = logging.getLogger('rl_circuit')
 
 class ResNet(nn.Module):
     def __init__(self, game, gnn, num_res_blocks, num_hidden):
@@ -38,10 +43,14 @@ class ResNet(nn.Module):
             nn.Tanh()
         )
 
-    def forward(self, state, node_attr, edge_index, edge_attr):
-        node_emb = self.gnn(node_attr, edge_index, edge_attr).squeeze(1)
-        x = self.game.encode_state(state, node_emb)
+    def forward(self, encoded_state, node_attr, edge_index, edge_attr):
+
+        node_emb = self.gnn(node_attr, edge_index, edge_attr)
+        embeddings = node_emb.repeat(1, 1 , len(self.game.nodes))
+
+        x = torch.cat([encoded_state, embeddings], dim=0).unsqueeze(0).float()
         x = self.start_block(x)
+
         for res_block in self.back_bone:
             x = res_block(x)
 

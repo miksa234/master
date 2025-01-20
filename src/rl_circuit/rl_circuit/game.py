@@ -13,7 +13,6 @@ class NetGame:
         self.nodes = list(G.nodes)
         self.adj_matrix = nx.adjacency_matrix(G).toarray()
         self.data = self.get_net_data().to(DEVICE)
-        self.node_emb = self.data.x
 
     def get_next_state(self, state, action):
         # state is a set of nodes, last one where we are
@@ -34,6 +33,7 @@ class NetGame:
     def check_win(self, state):
         return state[0] == state[-1] and len(state) > 1
 
+    #TODO: NEEDS TO CHANGE
     def get_value_and_terminated(self, state):
         valid_actions = self.get_valid_actions(state)
 
@@ -43,7 +43,7 @@ class NetGame:
             return 0, False
 
         edge_list = [(state[i], state[i+1]) for i in range(len(state)-1)]
-        value =  1 / sum(self.G[edge[0]][edge[1]]['weight'] for edge in edge_list)
+        value =  np.prod([self.G[edge[0]][edge[1]]['weight'] for edge in edge_list])
 
         if self.check_win(state):
             return value + 1, True
@@ -56,7 +56,8 @@ class NetGame:
         weights = [self.edges[e] for e in self.edges]
 
         #TODO: NODE ATTRIBUTES ????
-        node_attributes = [[np.random.choice([-1, 0, 1])] for _ in self.nodes]
+        # for now use the node degree
+        node_attributes = [[degree] for _, degree in self.G.degree()]
 
         edge_index = torch.tensor(edge_list, dtype=torch.long).t().contiguous()
         node_attr  = torch.tensor(node_attributes, dtype=torch.float)
@@ -67,7 +68,7 @@ class NetGame:
 
 
 
-    def encode_state(self, state, node_emb):
+    def encode_state(self, state, loc):
         A = torch.tensor(self.adj_matrix).unsqueeze(0).to(DEVICE)
 
         V = torch.zeros(self.adj_matrix.shape)
@@ -77,16 +78,14 @@ class NetGame:
 
         V = V.unsqueeze(0).to(DEVICE)
 
-        embeddings = node_emb.unsqueeze(1).repeat(1, 1 , len(self.nodes))
+        current_node = torch.tensor(loc).unsqueeze(0).repeat(1, len(self.nodes), len(self.nodes)).to(DEVICE)
 
-        current_node = state[-1].unsqueeze(0).repeat(1, len(self.nodes), len(self.nodes))
-
-        return torch.cat([A, V, embeddings, current_node], dim=0).float().unsqueeze(0)
+        encoded_state = torch.cat([A, V, current_node], dim=0).float()
+        return encoded_state
 
     def mask_policy(self, policy, state):
         valid_nodes = [i for _, i in self.get_valid_actions(state)]
         mask = [i for i in range(len(self.nodes)) if i not in valid_nodes]
         policy[mask] = 0
-        policy.to(DEVICE)
         return policy / policy.sum()
 
