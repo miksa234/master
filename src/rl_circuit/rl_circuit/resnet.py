@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from .config import DEVICE
+from .gnn import GNNEncoder
 
 import torch
 from torch import nn
@@ -10,11 +11,28 @@ import logging
 logger = logging.getLogger('rl_circuit')
 
 class ResNet(nn.Module):
-    def __init__(self, game, gnn, num_res_blocks, num_hidden):
+    def __init__(
+        self,
+        game,
+        num_res_blocks,
+        num_hidden,
+        gnn_in_channels,
+        gnn_hidden_channels,
+        gnn_out_channels,
+        gnn_num_heads=4,
+        gnn_num_layers=3
+    ):
         super().__init__()
 
-        self.gnn = gnn
         self.game = game
+
+        self.gnn = GNNEncoder(
+            gnn_in_channels,
+            gnn_hidden_channels,
+            gnn_out_channels,
+            gnn_num_heads,
+            gnn_num_layers
+        )
 
         self.start_block = nn.Sequential(
             nn.Conv2d(4, num_hidden, kernel_size=3, padding=1),
@@ -43,12 +61,16 @@ class ResNet(nn.Module):
             nn.Tanh()
         )
 
-    def forward(self, encoded_state, node_attr, edge_index, edge_attr):
+    def forward(self, encoded_states, node_attr, edge_index, edge_attr):
 
         node_emb = self.gnn(node_attr, edge_index, edge_attr)
         embeddings = node_emb.repeat(1, 1 , len(self.game.nodes))
 
-        x = torch.cat([encoded_state, embeddings], dim=0).unsqueeze(0).float()
+        if list(encoded_states.shape) == [3, *self.game.adj_matrix.shape]:
+            x = torch.cat([encoded_states, embeddings], dim=0).unsqueeze(0).float()
+        else:
+            x= torch.stack([torch.cat([state, embeddings], dim=0).float() for state in encoded_states], dim=0)
+
         x = self.start_block(x)
 
         for res_block in self.back_bone:

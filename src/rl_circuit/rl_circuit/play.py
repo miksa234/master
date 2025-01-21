@@ -49,68 +49,58 @@ def run():
 #    G = nx.relabel_nodes(G, mapping)
 #    for _, _, w in G.edges(data=True):
 #        w['weight'] = round(np.random.uniform(0.7, 1.4), 4)
-#
-    G = nx.fast_gnp_random_graph(6, 1, seed=1)
-    for _, _, w in G.edges(data=True):
-        w['weight'] = round(np.random.uniform(0.7, 1.4), 4)
 
+
+    weights = np.random.uniform(0.7, 1.4, size=(6, 6))
+    weights = np.triu(1/weights, k=0) + np.tril(weights.T, k=0)
+    np.fill_diagonal(weights, 0)
+    G = nx.from_numpy_array(weights, create_using=nx.DiGraph)
 
     ## Just scramble code to test if shit works
 
     args = {
         'C': 2,
-        'num_searches': 60,
-        'num_iterations': 3,
-        'num_self_play_iterations': 100,
+        'num_searches': 100,
+        'num_iterations': 5,
+        'num_self_play_iterations': 40,
+        'num_parallel': 10,
         'num_epochs': 4,
-        'batch_size': 32,
+        'batch_size': 5,
         'temperature': 1.25,
         'eps': 0.25,
         'dirichlet_alpha': 0.3,
-        'num_processes': 4
+        'num_processes': mp.cpu_count(),
     }
 
     game = NetGame(G)
 
-    gnn = GATConv(
-        in_channels=1,
-        out_channels=1,
-        heads=1,
-        concat=True,
-        negative_slope=0.2,
-        dropout=0,
-        add_self_loops=True,
-        edge_dim=1,
-        fill_value="mean",
-        bias=False,
-        residual=False
+    model = ResNet(
+        game,
+        num_res_blocks=6,
+        num_hidden=256,
+        gnn_in_channels=1,
+        gnn_hidden_channels=128,
+        gnn_out_channels=1,
+        gnn_num_heads=8,
+        gnn_num_layers=4
     ).to(DEVICE).share_memory()
 
-    model = ResNet(game, gnn, 16, 256).to(DEVICE).share_memory()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.0001)
 
     mcts = MCTS(game, args, model)
 
-    data = game.get_net_data().to(DEVICE).share_memory_()
-
-    model.load_state_dict(torch.load('./model/model_2.pt', weights_only=True))
+    model.load_state_dict(torch.load('./model/model_9.pt', weights_only=True))
 
 #    alpha_zero = AlphaZero(model, optimizer, game, args)
-#    alpha_zero.learn(data)
+#    alpha_zero.learn()
 
+    model.eval()
     for s in game.nodes:
         state = [s]
         while True:
             #logger.info(f"STATE: {state}")
-            valid_actions = game.get_valid_actions(state)
-            model_val, model_probs  = model(
-                game.encode_state(state, state[-1]),
-                data.x,
-                data.edge_index,
-                data.edge_attr
-            )
-
-            model_probs = torch.softmax(model_probs.squeeze(0), dim=0).detach().cpu().numpy()
+            model_probs = torch.tensor(mcts.search(state))
+            model_probs = torch.softmax(model_probs, dim=0).numpy()
             model_probs = game.mask_policy(model_probs, state)
 
             action = [state[-1], int(np.random.choice(game.nodes, p=model_probs))]
@@ -118,12 +108,17 @@ def run():
 
 
             value, is_terminal = game.get_value_and_terminated(state)
+
             #logger.info(f"Value: {value}")
 
 
             if is_terminal:
+                profit = np.exp(value)
                 if game.check_win(state):
-                    logger.info(f'WON {state} with value {value}')
+                    if profit < 1:
+                        logger.info(f'LOSS {state} with value {profit}')
+                    else:
+                        logger.info(f'WON {state} with value {profit}')
                 else:
-                    logger.info(f'LOSS {state} with valule {value}')
+                    logger.info(f'LOSS {state} with valule {profit}')
                 break

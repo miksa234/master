@@ -33,29 +33,52 @@ class NetGame:
     def check_win(self, state):
         return state[0] == state[-1] and len(state) > 1
 
-    #TODO: NEEDS TO CHANGE
     def get_value_and_terminated(self, state):
         valid_actions = self.get_valid_actions(state)
 
-        if len(state) <= 1 and len(valid_actions) == 0:
-            return -1, True
-        if len(state) <= 1 and len(valid_actions) > 0:
-            return 0, False
+        value = 0
+        terminated = False
 
-        edge_list = [(state[i], state[i+1]) for i in range(len(state)-1)]
-        value =  np.prod([self.G[edge[0]][edge[1]]['weight'] for edge in edge_list])
+        if len(valid_actions) == 0:
+            value = 0
+            terminated = True
+        if len(state) <= 1 and len(valid_actions) == 0:
+            value = -1
+            terminated = True
+        if len(state) <= 1 and len(valid_actions) > 0:
+            value = 0
+            terminated = False
 
         if self.check_win(state):
-            return value + 1, True
-        if len(valid_actions) == 0:
-            return value - 1, True
-        return value, False
+            trade_penalty = 1 - 0.01 # 1 percent of the trade
+            edge_list = [(state[i], state[i+1]) for i in range(len(state)-1)]
+            value = np.log(np.prod([self.G[edge[0]][edge[1]]['weight']*trade_penalty for edge in edge_list]))
+            terminated = True
+
+        elif len(state) > 1:
+            value = self.estimate_value(state)
+            terminated = False
+
+        return value, terminated
+
+    def estimate_value(self, state):
+        trade_penalty = 1 - 0.01 # 1 percent of the trade
+        edge_list = [(state[i], state[i+1]) for i in range(len(state)-1)]
+        r_cum = np.prod([self.G[edge[0]][edge[1]]['weight']*trade_penalty for edge in edge_list])
+
+        r_rem = max((self.edges[edge] for edge in self.G.edges(state[-1]) if edge not in edge_list), default=1.0)
+        return np.log(r_cum*r_rem)
+
+    def get_profit(self, state):
+        edge_list = [(state[i], state[i+1]) for i in range(len(state)-1)]
+        profit = np.prod([self.G[edge[0]][edge[1]]['weight'] for edge in edge_list])
+        return profit
 
     def get_net_data(self):
         edge_list = [list(e) for e in self.edges]
         weights = [self.edges[e] for e in self.edges]
 
-        #TODO: NODE ATTRIBUTES ????
+        # TODO: NODE ATTRIBUTES ????
         # for now use the node degree
         node_attributes = [[degree] for _, degree in self.G.degree()]
 
@@ -68,7 +91,7 @@ class NetGame:
 
 
 
-    def encode_state(self, state, loc):
+    def encode_state(self, state):
         A = torch.tensor(self.adj_matrix).unsqueeze(0).to(DEVICE)
 
         V = torch.zeros(self.adj_matrix.shape)
@@ -78,7 +101,7 @@ class NetGame:
 
         V = V.unsqueeze(0).to(DEVICE)
 
-        current_node = torch.tensor(loc).unsqueeze(0).repeat(1, len(self.nodes), len(self.nodes)).to(DEVICE)
+        current_node = torch.tensor(state[-1]).unsqueeze(0).repeat(1, len(self.nodes), len(self.nodes)).to(DEVICE)
 
         encoded_state = torch.cat([A, V, current_node], dim=0).float()
         return encoded_state

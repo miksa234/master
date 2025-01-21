@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from .mcts import MCTS
+from .mcts import MCTS, MCTSParallel, PMemory
 from .game import NetGame
 from .config import DEVICE
 
@@ -9,6 +9,8 @@ import numpy as np
 import torch
 import torch.multiprocessing as mp
 from torch.nn import functional as F
+
+from tqdm import tqdm
 
 import time
 
@@ -22,38 +24,51 @@ class AlphaZero:
         self.optimizer = optimizer
         self.game = game
         self.args = args
-        self.mcts = MCTS(self.game, self.args, self.model)
+        self.mcts = MCTSParallel(self.game, self.args, self.model)
 
 
     def self_play(self):
-        memory = []
-        state = [np.random.choice(self.game.nodes)]
+        return_mem = []
+        p_memory = [PMemory(self.game) for _ in range(self.args['num_parallel'])]
 
-        while True:
-            #valid_actions = self.game.get_valid_actions(state)
-            probs = self.mcts.search(state)
-            memory.append((state, probs))
+        while len(p_memory) > 0:
+            states = [mem.state for mem in p_memory]
+            self.mcts.search(states, p_memory)
 
-            temp_probs = probs ** (1 / self.args['temperature'])
-            temp_probs /= temp_probs.sum()
+            for i in range(len(p_memory))[::-1]:
+                mem = p_memory[i]
 
-            action = [state[-1], np.random.choice(self.game.nodes, p=temp_probs)]
-            state = self.game.get_next_state(state, action)
-            value, is_terminal = self.game.get_value_and_terminated(state)
+                probs = np.zeros(len(self.game.nodes))
+                for child in mem.root.children:
+                    probs[child.action_taken[1]] = child.visit_count
 
-            if is_terminal:
-                return_mem = []
-                for hist_state, hist_probs in memory:
-                    return_mem.append((
-                        self.game.encode_state(hist_state, hist_state[-1]).share_memory_(),
-                        hist_probs,
-                        value
+                probs /= np.sum(probs)
 
-                    ))
-                return return_mem
+                mem.memory.append((
+                    mem.root.state,
+                    probs
+                ))
+
+                temp_probs = probs ** (1 / self.args['temperature'])
+                temp_probs /= temp_probs.sum()
+
+                action = [mem.state[-1], np.random.choice(self.game.nodes, p=temp_probs)]
+                mem.state = self.game.get_next_state(mem.state, action)
+                value, is_terminal = self.game.get_value_and_terminated(mem.state)
+
+                if is_terminal:
+                    for hist_state, hist_probs in mem.memory:
+                        return_mem.append((
+                            self.game.encode_state(hist_state).share_memory_(),
+                            hist_probs,
+                            value
+
+                        ))
+                    del p_memory[i]
+        return return_mem
 
 
-    def train(self, memory, data):
+    def train(self, memory):
         np.random.shuffle(memory)
         for batch_idx in range(0, len(memory), self.args['batch_size']):
             sample = memory[batch_idx:np.min([len(memory) - 1, batch_idx + self.args['batch_size']])]
@@ -62,20 +77,17 @@ class AlphaZero:
 
             policy_targets, value_targets = np.array(policy_targets), np.array(value_targets)
             policy_targets, value_targets = torch.tensor(policy_targets).to(DEVICE).float(), torch.tensor(value_targets).to(DEVICE).float()
+            encoded_states = torch.stack(encoded_states, dim=0)
 
-
-            policy_outs, value_outs = [], []
-            for encoded_state in encoded_states:
-                out_value, out_policy = self.model(encoded_state, data.x, data.edge_index, data.edge_attr)
-                out_policy = torch.softmax(out_policy.squeeze(0), dim=0)
-                policy_outs.append(out_policy.unsqueeze(0))
-                value_outs.append(out_value)
-
-            policy_outs = torch.cat(policy_outs, dim=0)
-            value_outs = torch.cat(value_outs, dim=0).squeeze(1)
+            value_outs, policy_outs = self.model(
+                encoded_states,
+                self.game.data.x,
+                self.game.data.edge_index,
+                self.game.data.edge_attr
+            )
 
             policy_loss = F.cross_entropy(policy_outs, policy_targets)
-            value_loss = F.mse_loss(value_outs, value_targets)
+            value_loss = F.mse_loss(value_outs, value_targets.unsqueeze(1))
             loss = policy_loss + value_loss
 
 
@@ -83,41 +95,44 @@ class AlphaZero:
             loss.backward()
             self.optimizer.step()
 
-
-
-
-    def learn(self, data):
+    def learn(self):
         for iteration in range(self.args['num_iterations']):
             logger.info(f"Iterations {iteration+1}/{self.args['num_iterations']}")
             memory = []
-            self.model.eval()
 
+            self.model.eval()
 #            start = time.time()
-#            for play_iter in range(self.args['num_self_play_iterations']):
-#                logger.info(f"SelfPlay {play_iter+1}/{self.args['num_self_play_iterations']}")
+#            for play_iter in tqdm(range(self.args['num_self_play_iterations']//self.args['num_parallel']), desc="self_play"):
+#                print()
+#                #logger.info(f"SelfPlay {play_iter+1}/{self.args['num_self_play_iterations']//self.args['num_parallel']}")
 #                memory += self.self_play()
 #            end = time.time()
 #            logger.info(f"normal execution {end-start}")
 
             play_iter = self.args['num_self_play_iterations']
+            num_parallel = self.args['num_parallel']
             num_processes = self.args['num_processes']
+
+            per_processor = play_iter//num_parallel//num_processes
+
             start = time.time()
             with mp.Pool(processes=num_processes) as pool:
                 results = pool.starmap(
                     self_play_num_times,
-                    [(self, play_iter//num_processes) for _ in range(num_processes)]
+                    [(self, per_processor) for _ in range(num_processes)]
                 )
                 pool.terminate()
             end = time.time()
-            logger.info(f"paralle execution {end-start}")
 
             for result in results:
                 memory += result
 
+            logger.info(f"{len(memory)}")
+
             self.model.train()
-            for epoch_iter in range(self.args['num_epochs']):
-                logger.info(f"Epoch {epoch_iter}/{self.args['num_epochs']}")
-                self.train(memory, data)
+            for epoch_iter in tqdm(range(self.args['num_epochs']), desc="epochs"):
+                #logger.info(f"Epoch {epoch_iter+1}/{self.args['num_epochs']}")
+                self.train(memory)
 
             torch.save(self.model.state_dict(), f"./model/model_{iteration}.pt")
             torch.save(self.optimizer.state_dict(), f"./model/optimizer_{iteration}.pt")
