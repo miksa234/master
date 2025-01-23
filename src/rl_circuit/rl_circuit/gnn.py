@@ -9,6 +9,7 @@ class GNNEncoder(nn.Module):
     def __init__(
         self,
         in_channels,
+        edge_dim,
         hidden_channels,
         out_channels,
         num_heads,
@@ -18,7 +19,8 @@ class GNNEncoder(nn.Module):
 
         self.conv_in = GATConv(
             in_channels, hidden_channels,
-            heads=num_heads, concat=True, dropout=0.1
+            heads=num_heads, concat=True, dropout=0.1,
+            edge_dim=edge_dim
          )
 
         self.hidden_convs = nn.ModuleList(
@@ -32,8 +34,8 @@ class GNNEncoder(nn.Module):
 
 
 
-    def forward(self, x, edge_index, edge_attr, batch=None):
-        x = self.conv_in(x, edge_index, edge_attr)
+    def forward(self, node_attr, edge_index, edge_attr, batch=None):
+        x = self.conv_in(node_attr, edge_index, edge_attr)
         x = F.relu(x)
 
         for conv in self.hidden_convs:
@@ -44,4 +46,5 @@ class GNNEncoder(nn.Module):
 
         if batch is not None:
             x = global_mean_pool(x, batch)
+
         return x

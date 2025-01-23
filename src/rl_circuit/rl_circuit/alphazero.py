@@ -41,7 +41,6 @@ class AlphaZero:
                 probs = np.zeros(len(self.game.nodes))
                 for child in mem.root.children:
                     probs[child.action_taken[1]] = child.visit_count
-
                 probs /= np.sum(probs)
 
                 mem.memory.append((
@@ -59,7 +58,7 @@ class AlphaZero:
                 if is_terminal:
                     for hist_state, hist_probs in mem.memory:
                         return_mem.append((
-                            self.game.encode_state(hist_state).share_memory_(),
+                            hist_state,
                             hist_probs,
                             value
 
@@ -72,19 +71,21 @@ class AlphaZero:
         np.random.shuffle(memory)
         for batch_idx in range(0, len(memory), self.args['batch_size']):
             sample = memory[batch_idx:np.min([len(memory) - 1, batch_idx + self.args['batch_size']])]
-
-            encoded_states, policy_targets, value_targets = zip(*sample)
+            states , policy_targets, value_targets = zip(*sample)
 
             policy_targets, value_targets = np.array(policy_targets), np.array(value_targets)
             policy_targets, value_targets = torch.tensor(policy_targets).to(DEVICE).float(), torch.tensor(value_targets).to(DEVICE).float()
-            encoded_states = torch.stack(encoded_states, dim=0)
 
-            value_outs, policy_outs = self.model(
-                encoded_states,
-                self.game.data.x,
-                self.game.data.edge_index,
-                self.game.data.edge_attr
-            )
+            value_outs, policy_outs = [], []
+            for s in states:
+                v, p = self.model(
+                    *self.game.encode_state(s)
+                )
+                value_outs += v
+                policy_outs += p
+
+            value_outs = torch.stack(value_outs).to(DEVICE).unsqueeze(1)
+            policy_outs = torch.stack(policy_outs).to(DEVICE)
 
             policy_loss = F.cross_entropy(policy_outs, policy_targets)
             value_loss = F.mse_loss(value_outs, value_targets.unsqueeze(1))
@@ -103,8 +104,6 @@ class AlphaZero:
             self.model.eval()
 #            start = time.time()
 #            for play_iter in tqdm(range(self.args['num_self_play_iterations']//self.args['num_parallel']), desc="self_play"):
-#                print()
-#                #logger.info(f"SelfPlay {play_iter+1}/{self.args['num_self_play_iterations']//self.args['num_parallel']}")
 #                memory += self.self_play()
 #            end = time.time()
 #            logger.info(f"normal execution {end-start}")
@@ -131,7 +130,6 @@ class AlphaZero:
 
             self.model.train()
             for epoch_iter in tqdm(range(self.args['num_epochs']), desc="epochs"):
-                #logger.info(f"Epoch {epoch_iter+1}/{self.args['num_epochs']}")
                 self.train(memory)
 
             torch.save(self.model.state_dict(), f"./model/model_{iteration}.pt")

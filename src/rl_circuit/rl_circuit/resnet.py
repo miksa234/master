@@ -6,6 +6,7 @@ from .gnn import GNNEncoder
 import torch
 from torch import nn
 from torch.nn import functional as F
+from torch_geometric.nn import BatchNorm, GATv2Conv, Sequential, Linear
 
 import logging
 logger = logging.getLogger('rl_circuit')
@@ -13,86 +14,72 @@ logger = logging.getLogger('rl_circuit')
 class ResNet(nn.Module):
     def __init__(
         self,
-        game,
-        num_res_blocks,
-        num_hidden,
-        gnn_in_channels,
-        gnn_hidden_channels,
-        gnn_out_channels,
-        gnn_num_heads=4,
-        gnn_num_layers=3
+        in_channels,
+        edge_dim,
+        emb_channels,
+        num_heads=4,
+        num_layers=3
     ):
         super().__init__()
 
-        self.game = game
+        self.in_block = ResBlock(in_channels, emb_channels, edge_dim, num_heads)
 
-        self.gnn = GNNEncoder(
-            gnn_in_channels,
-            gnn_hidden_channels,
-            gnn_out_channels,
-            gnn_num_heads,
-            gnn_num_layers
-        )
+        self.hidden_blocks = nn.ModuleList()
+        for _ in range(num_layers-1):
+            self.hidden_blocks.append(
+                ResBlock(
+                    emb_channels, emb_channels, edge_dim, num_heads
+                )
+            )
 
-        self.start_block = nn.Sequential(
-            nn.Conv2d(4, num_hidden, kernel_size=3, padding=1),
-            nn.BatchNorm2d(num_hidden),
-            nn.ReLU()
-        )
-
-        self.back_bone = nn.ModuleList(
-            [ResBlock(num_hidden) for _ in range(num_res_blocks)]
-        )
-
-        self.policy_head = nn.Sequential(
-            nn.Conv2d(num_hidden, 32, kernel_size=3, padding=1),
-            nn.BatchNorm2d(32),
+        self.policy_head = Sequential('x, edge_index', [
+            (GATv2Conv(emb_channels, emb_channels, heads=1), 'x, edge_index -> x'),
+            BatchNorm(emb_channels),
             nn.ReLU(),
-            nn.Flatten(),
-            nn.Linear(32 * len(game.nodes)**2, len(game.nodes)),
-        )
+            Linear(emb_channels, 1),
+        ])
 
-        self.value_head = nn.Sequential(
-            nn.Conv2d(num_hidden, 4, kernel_size=3, padding=1),
-            nn.BatchNorm2d(4),
+        self.value_head = Sequential('x, edge_index', [
+            (GATv2Conv(emb_channels, emb_channels, heads=1), 'x, edge_index -> x'),
+            BatchNorm(emb_channels),
             nn.ReLU(),
-            nn.Flatten(),
-            nn.Linear(4 * len(game.nodes)**2, 1),
-            nn.Tanh()
-        )
+            Linear(emb_channels, 1),
+            nn.Tanh(),
+        ])
 
-    def forward(self, encoded_states, node_attr, edge_index, edge_attr):
 
-        node_emb = self.gnn(node_attr, edge_index, edge_attr)
-        embeddings = node_emb.repeat(1, 1 , len(self.game.nodes))
+    def forward(self, node_attr, edge_index, edge_attr):
+        x = self.in_block(node_attr, edge_index, edge_attr)
+        for block in self.hidden_blocks:
+            x = block(x, edge_index, edge_attr)
 
-        if list(encoded_states.shape) == [3, *self.game.adj_matrix.shape]:
-            x = torch.cat([encoded_states, embeddings], dim=0).unsqueeze(0).float()
-        else:
-            x= torch.stack([torch.cat([state, embeddings], dim=0).float() for state in encoded_states], dim=0)
+        policy = self.policy_head(x, edge_index).T
+        value = torch.tensor([self.value_head(x, edge_index).mean()])
 
-        x = self.start_block(x)
-
-        for res_block in self.back_bone:
-            x = res_block(x)
-
-        policy = self.policy_head(x)
-        value = self.value_head(x)
         return value, policy
 
-
 class ResBlock(nn.Module):
-    def __init__(self, num_hidden):
+    def __init__(self, in_channels, emb_channels, edge_dim, num_heads):
         super().__init__()
-        self.conv1 = nn.Conv2d(num_hidden, num_hidden, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(num_hidden)
-        self.conv2 = nn.Conv2d(num_hidden, num_hidden, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(num_hidden)
+        self.in_layer = Sequential('x, edge_index, edge_attr', [
+            (GATv2Conv(in_channels, emb_channels, heads=num_heads, edge_dim=edge_dim), 'x, edge_index, edge_attr -> x'),
+            BatchNorm(emb_channels*num_heads),
+            Linear(emb_channels*num_heads, emb_channels, bias=False)
+        ])
 
-    def forward(self, x):
+        self.feed_forward = nn.Sequential(
+            Linear(emb_channels, 512),
+            nn.ReLU(),
+            Linear(512, emb_channels)
+        )
+        self.batch_norm2 = BatchNorm(emb_channels)
+
+    def forward(self, node_attr, edge_index, edge_attr):
+
+        x = self.in_layer(node_attr, edge_index, edge_attr)
+
         res = x
-        x = F.relu(self.bn1(self.conv1(x)))
-        x = self.bn2(self.conv2(x))
-        x += res
-        x = F.relu(x)
+        x = self.feed_forward(x)
+        x = self.batch_norm2(res + x)
+
         return x

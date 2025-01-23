@@ -13,7 +13,8 @@ def main():
 
     if hostname == "frame":
         cwd = os.getcwd()
-        print(subprocess.getoutput(f"rsync -Pr {cwd} mycomp:~/"))
+        print("\nCopying code...\n")
+        subprocess.getoutput(f"rsync -Pr {cwd} mycomp:~/")
         print("\nExecuting code remotely...\n")
         with subprocess.Popen("ssh -4 mycomp 'source py_env/bin/activate && cd ./rl_circuit && ./main.py'", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True) as process:
             for line in process.stdout:

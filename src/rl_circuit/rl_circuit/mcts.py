@@ -115,10 +115,7 @@ class MCTS:
         root = Node(self.game, self.args, state, visit_count=1)
 
         _, policy = self.model(
-            self.game.encode_state(root.state),
-            self.game.data.x,
-            self.game.data.edge_index,
-            self.game.data.edge_attr
+            *self.game.encode_state(root.state)
         )
         policy = torch.softmax(policy.squeeze(0), dim=0).detach().cpu().numpy()
 
@@ -137,12 +134,10 @@ class MCTS:
 
 
             value, is_terminal = self.game.get_value_and_terminated(node.state)
+
             if not is_terminal:
                 value, policy = self.model(
-                    self.game.encode_state(node.state),
-                    self.game.data.x,
-                    self.game.data.edge_index,
-                    self.game.data.edge_attr
+                    *self.game.encode_state(root.state)
                 )
                 policy = torch.softmax(policy.squeeze(0), dim=0)
                 policy = self.game.mask_policy(policy, node.state)
@@ -181,12 +176,10 @@ class MCTSParallel:
     @torch.no_grad()
     def search(self, states, p_memory):
 
-        _, policy = self.model(
-            torch.stack([self.game.encode_state(s) for s in states], dim=0),
-            self.game.data.x,
-            self.game.data.edge_index,
-            self.game.data.edge_attr
-        )
+        policy = []
+        for s in states:
+            policy += self.model(*self.game.encode_state(s))[1]
+        policy = torch.stack(policy)
 
         policy = torch.softmax(policy, dim=1).detach().cpu().numpy()
 
@@ -218,13 +211,16 @@ class MCTSParallel:
             expandable = [i for i in range(len(p_memory)) if p_memory[i].node != None]
 
             if len(expandable) > 0:
-                encoded_states = torch.stack([self.game.encode_state(p_memory[i].node.state) for i in expandable], dim=0)
-                value, policy = self.model(
-                    encoded_states,
-                    self.game.data.x,
-                    self.game.data.edge_index,
-                    self.game.data.edge_attr
-                )
+                value, policy = [], []
+                for i in expandable:
+                    v, p = self.model(
+                        *self.game.encode_state(p_memory[i].node.state)
+                    )
+                    value += v
+                    policy += p
+                policy = torch.stack(policy)
+                value = torch.stack(value)
+
                 policy = torch.softmax(policy, dim=1)
 
             for i, idx in enumerate(expandable):
