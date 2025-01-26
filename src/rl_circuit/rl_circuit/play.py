@@ -53,8 +53,9 @@ def run():
 #        w['weight'] = round(np.random.uniform(0.7, 1.4), 4)
 
 
-    weights = np.random.uniform(0.7, 1.4, size=(6, 6))
+    weights = np.random.uniform(0.01, 100, size=(6, 6))
     weights = np.triu(1/weights, k=0) + np.tril(weights.T, k=0)
+    weights = np.log(weights)
     np.fill_diagonal(weights, 0)
     G = nx.from_numpy_array(weights, create_using=nx.DiGraph)
 
@@ -89,7 +90,7 @@ def run():
     ## Just scramble code to test if shit works
 
     args = {
-        'C': 2,
+        'C': 10,
         'num_searches': 600,
         'num_iterations': 8,
         'num_self_play_iterations': 800,
@@ -128,33 +129,33 @@ def run():
 
     mcts = MCTS(game, args, model)
 
-    alpha_zero = AlphaZero(model, optimizer, game, args)
-    alpha_zero.learn()
+#    alpha_zero = AlphaZero(model, optimizer, game, args)
+#    alpha_zero.learn()
 
-#    print(weights)
-#    model.load_state_dict(torch.load('./model/model_4.pt', weights_only=True))
-#    model.eval()
-#    for s in game.nodes:
-#        state = [s]
-#        while True:
+    model.load_state_dict(torch.load('./model/model_7.pt', weights_only=True))
+    model.eval()
+    for s in game.nodes:
+        state = [s]
+        while True:
 #            x, edge_index, edge_attr = game.encode_state(state)
 #
 #            model_probs = torch.tensor(mcts.search(state))
 #            model_probs = torch.softmax(model_probs, dim=0).numpy()
 #            model_probs = game.mask_policy(model_probs, state)
-#
-#            action = [state[-1], int(np.random.choice(game.nodes, p=model_probs))]
-#            state = game.get_next_state(state, action)
-#
-#            value, is_terminal = game.get_value_and_terminated(state)
-#
-#            if is_terminal:
-#                profit = np.exp(value/10)
-#                if game.check_terminal(state):
-#                    if profit < 1:
-#                        logger.info(f'LOSS {state} with value {profit}')
-#                    else:
-#                        logger.info(f'WON {state} with value {profit}')
-#                else:
-#                    logger.info(f'LOSS {state} with valule {profit}')
-#                break
+            probs = mcts.search(state)
+
+            action = [state[-1], int(np.random.choice(game.nodes, p=probs))]
+            state = game.get_next_state(state, action)
+
+            value, is_terminal = game.get_value_and_terminated(state)
+
+            if is_terminal:
+                profit = np.exp(value/1)
+                if game.check_terminal(state):
+                    if profit < 1:
+                        logger.info(f'LOSS {state} with profit {profit}')
+                    else:
+                        logger.info(f'WON {state} with profit {profit}')
+                else:
+                    logger.info(f'LOSS {state} with profit {profit}')
+                break

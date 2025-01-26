@@ -51,19 +51,16 @@ class NetGame:
             terminated = False
 
         if self.check_terminal(state):
-            trade_penalty = 1 - 0.01 # 1 percent of the trade
+            trade_penalty = np.log(1 - 0.01) # 1 percent of the trade
             edge_list = [(state[i], state[i+1]) for i in range(len(state)-1)]
-            win_loss_amplifier = 10
-            value = np.log(np.prod([self.G[edge[0]][edge[1]]['weight']*trade_penalty for edge in edge_list]))*win_loss_amplifier
+            win_loss_amplifier = 1
+            value = np.sum([self.edges[edge]+trade_penalty for edge in edge_list])*win_loss_amplifier
             terminated = True
 
+        # otherwise check if we go back to eth if we are in profit add return this value
+        # weth shouldbe node index 0 (or main currency)
+
         return value, terminated
-
-    def get_profit(self, state):
-        edge_list = [(state[i], state[i+1]) for i in range(len(state)-1)]
-        profit = np.prod([self.G[edge[0]][edge[1]]['weight'] for edge in edge_list])
-        return profit
-
 
     def encode_state(self, state):
         e_x = self.data.x.detach().clone()
