@@ -74,9 +74,9 @@ class Node:
         for action, prob in enumerate(policy):
             if prob > 0:
                 child_state = self.state.copy()
-                child_state = game.get_next_state(child_state, (self.state[-1], action))
+                child_state = game.get_next_state(child_state, game.edge_list[action])
 
-                child = Node(game, self.args, child_state, self, (self.state[-1], action), prob)
+                child = Node(game, self.args, child_state, self, game.edge_list[action], prob)
                 self.children.append(child)
 
     def simulate(self, game):
@@ -115,7 +115,8 @@ class MCTS:
         root = Node(self.game, self.args, state, visit_count=1)
 
         _, policy = self.model(
-            *self.game.encode_state(root.state)
+            self.game.encode_state(root.state),
+            self.game.data.edge_index,
         )
         policy = torch.softmax(policy.squeeze(0), dim=0).detach().cpu().numpy()
 
@@ -137,7 +138,8 @@ class MCTS:
 
             if not is_terminal:
                 value, policy = self.model(
-                    *self.game.encode_state(root.state)
+                    self.game.encode_state(root.state),
+                    self.game.data.edge_index
                 )
                 policy = torch.softmax(policy.squeeze(0), dim=0)
                 policy = self.game.mask_policy(policy, node.state)
@@ -158,9 +160,11 @@ class MCTS:
 
         # return visit_count distribution
         valid_actions = self.game.get_valid_actions(state)
-        action_probs = np.zeros(len(self.game.nodes))
+        action_probs = np.zeros(len(self.game.edge_list))
         for child in root.children:
-            action_probs[child.action_taken[1]] = child.visit_count
+            action_probs[
+                self.game.edge_list.index(child.action_taken)
+            ] = child.visit_count
 
         action_probs /= np.sum(action_probs)
         return action_probs
@@ -178,7 +182,10 @@ class MCTSParallel:
 
         policy = []
         for s in states:
-            policy += self.model(*self.game.encode_state(s))[1]
+            policy += self.model(
+                self.game.encode_state(s),
+                self.game.data.edge_index
+            )[1]
         policy = torch.stack(policy)
 
         policy = torch.softmax(policy, dim=1).detach().cpu().numpy()
@@ -214,7 +221,8 @@ class MCTSParallel:
                 value, policy = [], []
                 for i in expandable:
                     v, p = self.model(
-                        *self.game.encode_state(p_memory[i].node.state)
+                        self.game.encode_state(p_memory[i].node.state),
+                        self.game.data.edge_index
                     )
                     value += v
                     policy += p
@@ -235,7 +243,8 @@ class MCTSParallel:
 
 class PMemory:
     def __init__(self, game):
-        self.state = [int(np.random.choice(game.nodes))]
+        node = int(np.random.choice(game.nodes))
+        self.state = [(node, node, 0)]
         self.memory = []
         self.root = None
         self.node = None

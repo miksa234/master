@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from rl_circuit import *
+from rl_circuit.play import run
 from rl_circuit.logger import logging
 
 logger = logging.getLogger('rl_circuit')

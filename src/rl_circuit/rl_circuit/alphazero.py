@@ -38,9 +38,11 @@ class AlphaZero:
             for i in range(len(p_memory))[::-1]:
                 mem = p_memory[i]
 
-                probs = np.zeros(len(self.game.nodes))
+                probs = np.zeros(len(self.game.edge_list))
                 for child in mem.root.children:
-                    probs[child.action_taken[1]] = child.visit_count
+                    probs[
+                        self.game.edge_list.index(child.action_taken)
+                    ] = child.visit_count
                 probs /= np.sum(probs)
 
                 mem.memory.append((
@@ -51,7 +53,12 @@ class AlphaZero:
                 temp_probs = probs ** (1 / self.args['temperature'])
                 temp_probs /= temp_probs.sum()
 
-                action = [mem.state[-1], np.random.choice(self.game.nodes, p=temp_probs)]
+                action_idx = np.random.choice(
+                    list(range(len(self.game.edge_list))),
+                    p=probs
+                )
+                action = self.game.edge_list[action_idx]
+
                 mem.state = self.game.get_next_state(mem.state, action)
                 value, is_terminal = self.game.get_value_and_terminated(mem.state)
 
@@ -70,7 +77,8 @@ class AlphaZero:
     def train(self, memory):
         np.random.shuffle(memory)
         for batch_idx in range(0, len(memory), self.args['batch_size']):
-            sample = memory[batch_idx:np.min([len(memory) - 1, batch_idx + self.args['batch_size']])]
+            sample = memory[
+            batch_idx:np.min([len(memory) - 1, batch_idx + self.args['batch_size']])]
             states , policy_targets, value_targets = zip(*sample)
 
             policy_targets, value_targets = np.array(policy_targets), np.array(value_targets)
@@ -111,22 +119,16 @@ class AlphaZero:
             play_iter = self.args['num_self_play_iterations']
             num_parallel = self.args['num_parallel']
             num_processes = self.args['num_processes']
-
             per_processor = play_iter//num_parallel//num_processes
-
-            start = time.time()
             with mp.Pool(processes=num_processes) as pool:
                 results = pool.starmap(
                     self_play_num_times,
                     [(self, per_processor) for _ in range(num_processes)]
                 )
                 pool.terminate()
-            end = time.time()
 
             for result in results:
                 memory += result
-
-            logger.info(f"{len(memory)}")
 
             self.model.train()
             for epoch_iter in tqdm(range(self.args['num_epochs']), desc="epochs"):

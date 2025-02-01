@@ -73,15 +73,6 @@ sol!(
 
 sol!(
     #[sol(rpc)]
-    interface IUniswapV2Factory {
-        event PairCreated(address indexed token0, address indexed token1, address pair, uint);
-    }
-);
-
-
-sol!(
-    #[sol(rpc)]
-    interface IUniswapV3Factory {
-         event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool);
-    }
+    event PairCreated(address indexed token0, address indexed token1, address pair, uint);
+    event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool);
 );

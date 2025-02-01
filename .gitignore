@@ -3,6 +3,7 @@
 src/data/cached_pools.csv
 src/data/cached-honeypot.csv
 src/data/cached-tokens.csv
+data
 model
 
 # Packages
