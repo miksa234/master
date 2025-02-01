@@ -15,20 +15,19 @@ class ResNet(nn.Module):
     def __init__(
         self,
         in_channels,
-        edge_dim,
         emb_channels,
         num_heads=4,
         num_layers=3
     ):
         super().__init__()
 
-        self.in_block = ResBlock(in_channels, emb_channels, edge_dim, num_heads)
+        self.in_block = ResBlock(in_channels, emb_channels, num_heads)
 
         self.hidden_blocks = nn.ModuleList()
         for _ in range(num_layers-1):
             self.hidden_blocks.append(
                 ResBlock(
-                    emb_channels, emb_channels, edge_dim, num_heads
+                    emb_channels, emb_channels, num_heads
                 )
             )
 
@@ -48,10 +47,10 @@ class ResNet(nn.Module):
         ])
 
 
-    def forward(self, node_attr, edge_index, edge_attr):
-        x = self.in_block(node_attr, edge_index, edge_attr)
+    def forward(self, node_attr, edge_index):
+        x = self.in_block(node_attr, edge_index)
         for block in self.hidden_blocks:
-            x = block(x, edge_index, edge_attr)
+            x = block(x, edge_index)
 
         policy = self.policy_head(x, edge_index).T
         value = torch.tensor([self.value_head(x, edge_index).mean()])
@@ -59,10 +58,10 @@ class ResNet(nn.Module):
         return value, policy
 
 class ResBlock(nn.Module):
-    def __init__(self, in_channels, emb_channels, edge_dim, num_heads):
+    def __init__(self, in_channels, emb_channels, num_heads):
         super().__init__()
-        self.in_layer = Sequential('x, edge_index, edge_attr', [
-            (GATv2Conv(in_channels, emb_channels, heads=num_heads, edge_dim=edge_dim), 'x, edge_index, edge_attr -> x'),
+        self.in_layer = Sequential('x, edge_index', [
+            (GATv2Conv(in_channels, emb_channels, heads=num_heads), 'x, edge_index -> x'),
             BatchNorm(emb_channels*num_heads),
             Linear(emb_channels*num_heads, emb_channels, bias=False)
         ])
@@ -74,9 +73,9 @@ class ResBlock(nn.Module):
         )
         self.batch_norm2 = BatchNorm(emb_channels)
 
-    def forward(self, node_attr, edge_index, edge_attr):
+    def forward(self, node_attr, edge_index):
 
-        x = self.in_layer(node_attr, edge_index, edge_attr)
+        x = self.in_layer(node_attr, edge_index)
 
         res = x
         x = self.feed_forward(x)

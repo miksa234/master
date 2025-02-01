@@ -4,13 +4,13 @@
 #![allow(unused_mut)]
 
 use alloy::{
-    primitives::{Address, FixedBytes},
+    primitives::{Address, FixedBytes, address},
     providers::{RootProvider, Provider},
     rpc::types::{BlockId, BlockTransactionsKind, Filter},
     sol_types::SolEvent,
-    transports::http::{Client, Http}
+    transports::http::{Client, Http},
+    pubsub::PubSubFrontend,
 };
-
 use std::{
     collections::{BTreeMap, HashMap},
     fs::OpenOptions,
@@ -18,13 +18,12 @@ use std::{
     str::FromStr,
     sync::Arc
 };
-
 use indicatif::{ProgressBar, ProgressStyle};
 use anyhow::{Result, anyhow};
 use csv::StringRecord;
 use log::info;
 
-use crate::interfaces::{IUniswapV2Factory, IUniswapV3Factory};
+use crate::interfaces::*;
 
 
 #[derive(Debug, Clone)]
@@ -91,11 +90,10 @@ impl Pool {
 }
 
 pub async fn load_pools(
-    provider: RootProvider<Http<Client>>,
+    provider: RootProvider<PubSubFrontend>,
     path: &Path,
     from_block: u64,
     chunk: u64,
-    parallel: u64
 ) -> Result<(BTreeMap<Address, Pool>, i64)> {
 
     info!("Loading Pools...");
@@ -169,52 +167,45 @@ pub async fn load_pools(
         processed_blocks += chunk;
     }
 
+    let sigs = vec![
+        PoolCreated::SIGNATURE_HASH, // v3
+        PairCreated::SIGNATURE_HASH, // v3
+    ];
+
+    let factories = vec![
+        address!("0x1F98431c8aD98523631AE4a59f267346ea31F984"),
+        address!("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"),
+    ];
+
+
     let pb = ProgressBar::new(to_block-from_block);
     pb.set_style(
         ProgressStyle::with_template(
-            "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+            "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} current pools: {msg}",
         )
         .unwrap()
         .progress_chars("##-"),
     );
+    pb.inc(0);
 
-    let mut signatures = Vec::new();
-    signatures.push(IUniswapV3Factory::PoolCreated::SIGNATURE_HASH);
-    signatures.push(IUniswapV2Factory::PairCreated::SIGNATURE_HASH);
-
-    let mut count = 0;
-    let mut requests = vec![];
     for range in block_range {
-        requests.push(
-            tokio::task::spawn(
-                get_pool_data(
-                    provider.clone(),
-                    range.0,
-                    range.1,
-                    signatures.clone()
-                )
-            )
-        );
-        count += 1;
-        if count == parallel {
-            count = 0;
-            let results = futures::future::join_all(requests).await;
-            for result in results {
-                match result {
-                    Ok(r) => match r {
-                        Ok(pool_vec) => {
-                            for p in pool_vec {
-                                pools.insert(p.address, p);
-                            }
-                        }
-                        _ => {}
-                    }
-                    _ => {}
-                }
+        match get_pool_data(
+            provider.clone(),
+            range.0,
+            range.1,
+            sigs.clone(),
+            factories.clone(),
+        ).await {
+            Ok(r) => {
+                for p in r { pools.insert(p.address, p); }
             }
-            pb.inc(parallel*chunk)
-        }
-        requests = vec![];
+            Err(e) => {
+                info!("get_pool_data call error {:?}", e);
+                continue;
+            }
+        };
+        pb.inc(chunk);
+        pb.set_message(format!("{:?} block range {:?}-{:?}", pools.len(), range.0, range.1));
     }
 
     let mut id = 0;
@@ -237,10 +228,11 @@ pub async fn load_pools(
 
 
 async fn get_pool_data(
-    provider: RootProvider<Http<Client>>,
+    provider: RootProvider<PubSubFrontend>,
     from_block: u64,
     to_block: u64,
     sig_hash: Vec<FixedBytes<32>>,
+    address: Vec<Address>,
 ) -> Result<Vec<Pool>> {
     let mut pools = Vec::new();
     let mut timestamp_map: HashMap<u64, u64> = HashMap::new();
@@ -248,36 +240,78 @@ async fn get_pool_data(
     let filter = Filter::new()
         .from_block(from_block)
         .to_block(to_block)
-        .event_signature(sig_hash);
+        .event_signature(sig_hash)
+        .address(address);
 
-    let logs = provider.get_logs(&filter).await?;
+    let logs = match provider.get_logs(&filter).await {
+        Ok(r) => r,
+        Err(e) => {
+            info!("Error getting logs {:?}", e);
+            return Ok(pools);
+        },
+    };
 
     for log in logs {
         let (version, address, token0, token1, fee, tickspacing) = match log.topic0().unwrap() {
-            &IUniswapV2Factory::PairCreated::SIGNATURE_HASH => {
-                let event = IUniswapV2Factory::PairCreated::decode_log_data(
+            &PairCreated::SIGNATURE_HASH => {
+                let event = match PairCreated::decode_log_data(
                     log.data(), true
-                ).unwrap();
+                ) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        info!("UniswapV2Factory decoding error {:?}", e);
+                        continue;
+                    }
+                };
                 let tickspacing: i32 = 0;
                 let fee: u32 = 3000;
                 (Version::V2, event.pair, event.token0, event.token1, fee, tickspacing)
             },
-            &IUniswapV3Factory::PoolCreated::SIGNATURE_HASH => {
-                let event = IUniswapV3Factory::PoolCreated::decode_log_data(
+            &PoolCreated::SIGNATURE_HASH => {
+                let event = match PoolCreated::decode_log_data(
                     log.data(), true
-                ).unwrap();
+                ) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        info!("UniswapV3Factory decoding error {:?}", e);
+                        continue;
+                    }
+                };
                 (Version::V3, event.pool, event.token0, event.token1, event.fee.to::<u32>(), event.tickSpacing.as_i32())
             },
-            _ => { continue; }
+            t => {
+                info!("Counld not match topic {:?}", t);
+                continue;
+            }
         };
 
-        let block_number = log.block_number.unwrap();
+        let block_number = match log.block_number {
+            Some(r) => r,
+            None => {
+                info!("log does not contain block_number");
+                0u64
+            }
+        };
 
         let timestamp = if !timestamp_map.contains_key(&block_number) {
-            let block = provider.get_block(
+            let block = match provider.get_block(
                 BlockId::from(block_number),
                 BlockTransactionsKind::default()
-            ).await.unwrap().unwrap();
+            ).await {
+                Ok(r) => {
+                    match r {
+                        Some(v) => v,
+                        None => {
+                            info!("No block returned");
+                            continue;
+                        }
+                    }
+                },
+                Err(e) => {
+                    info!("Could not get block {:?}", e);
+                    continue;
+                }
+            };
             let timestamp = block.header.timestamp;
             timestamp
         } else {
@@ -302,12 +336,21 @@ async fn get_pool_data(
     Ok(pools)
 }
 
+pub fn load_pools_from_file(
+    path: &Path,
+) -> Result<BTreeMap<Address, Pool>> {
+    let mut pools = BTreeMap::new();
 
+    if path.exists() {
+        let mut reader = csv::Reader::from_path(path)?;
+        for row in reader.records() {
+            let row = row.unwrap();
+            let pool = Pool::from(row);
+            pools.insert(pool.address, pool);
+        }
+    } else {
+        return Err(anyhow!("File path does not exist"));
+    }
 
-
-
-
-
-
-
-
+    Ok(pools)
+}

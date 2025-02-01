@@ -12,7 +12,8 @@ use std::{
 use alloy::{
     primitives::Address,
     providers::RootProvider,
-    transports::http::{Client, Http}
+    transports::http::{Client, Http},
+    pubsub::PubSubFrontend,
 };
 use indicatif::{ProgressBar, ProgressStyle};
 use anyhow::{anyhow, Result};
@@ -20,6 +21,7 @@ use csv::StringRecord;
 use log::info;
 
 use crate::{interfaces::IERC20, pools::Pool};
+
 
 #[derive(Debug, Clone)]
 pub struct Token {
@@ -55,10 +57,11 @@ impl Token {
 }
 
 pub async fn load_tokens(
-    provider: RootProvider<Http<Client>>,
+    provider: RootProvider<PubSubFrontend>,
     path: &Path,
     pools: &BTreeMap<Address, Pool>,
     parallel: u64,
+    last_pool_id: i64,
 ) -> Result<BTreeMap<Address, Token>> {
 
     info!("Loading tokens...");
@@ -109,6 +112,9 @@ pub async fn load_tokens(
 
     for (_, pool) in pools.into_iter() {
         let pool_id = pool.id;
+        if pool_id <= last_pool_id {
+            continue;
+        }
         let token0 = pool.token0;
         let token1 = pool.token1;
         for token in [token0, token1] {
@@ -165,24 +171,31 @@ pub async fn load_tokens(
     Ok(tokens)
 }
 
-
 async fn get_token_data(
-    provider: RootProvider<Http<Client>>,
+    provider: RootProvider<PubSubFrontend>,
     token: Address,
 ) -> Result<Token> {
 
     let interface = IERC20::new(token, provider);
-    let name = match interface.name().call().await {
-        Ok(r) => r.name,
-        Err(e) => { return Err(anyhow!("Name of token {:?} failed {:?}", token, e)) }
-    };
-    let symbol = match interface.symbol().call().await{
-        Ok(r) => r.symbol,
-        Err(e) => { return Err(anyhow!("Symbol of token failed {:?}", e )) }
-    };
+
     let decimals = match interface.decimals().call().await {
         Ok(r) => r.decimals,
         Err(e) => { return Err(anyhow!("Decimals of token failed {:?}", e )) }
+    };
+
+    let name = match interface.name().call().await {
+        Ok(r) => r.name,
+        Err(e) => {
+            info!("Name of token {:?} failed {:?}", token, e);
+            String::from("PlaceHolderName")
+        }
+    };
+    let symbol = match interface.symbol().call().await{
+        Ok(r) => r.symbol,
+        Err(e) => {
+            info!("Symbol of token failed {:?}", e );
+            String::from("PlaceHolderSymbol")
+        }
     };
 
     Ok(Token {
@@ -194,27 +207,21 @@ async fn get_token_data(
     })
 }
 
+pub fn load_tokens_from_file(
+    path: &Path,
+) -> Result<BTreeMap<Address, Token>> {
+    let mut tokens = BTreeMap::new();
 
+    if path.exists() {
+        let mut reader = csv::Reader::from_path(path)?;
+        for row in reader.records() {
+            let row = row.unwrap();
+            let token = Token::from(row);
+            tokens.insert(token.address, token);
+        }
+    } else {
+        return Err(anyhow!("File path does not exist"));
+    }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    Ok(tokens)
+}
