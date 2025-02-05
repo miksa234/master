@@ -12,8 +12,7 @@ use std::{
 use alloy::{
     primitives::Address,
     providers::RootProvider,
-    transports::http::{Client, Http},
-    pubsub::PubSubFrontend,
+    transports::{http::{Client, Http}, BoxTransport},
 };
 use indicatif::{ProgressBar, ProgressStyle};
 use anyhow::{anyhow, Result};
@@ -57,7 +56,7 @@ impl Token {
 }
 
 pub async fn load_tokens(
-    provider: RootProvider<PubSubFrontend>,
+    provider: RootProvider<BoxTransport>,
     path: &Path,
     pools: &BTreeMap<Address, Pool>,
     parallel: u64,
@@ -172,7 +171,7 @@ pub async fn load_tokens(
 }
 
 async fn get_token_data(
-    provider: RootProvider<PubSubFrontend>,
+    provider: RootProvider<BoxTransport>,
     token: Address,
 ) -> Result<Token> {
 

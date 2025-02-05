@@ -4,12 +4,11 @@
 #![allow(unused_mut)]
 
 use alloy::{
-    primitives::{Address, FixedBytes, address},
-    providers::{RootProvider, Provider},
+    primitives::{address, Address, FixedBytes},
+    providers::{Provider, RootProvider},
     rpc::types::{BlockId, BlockTransactionsKind, Filter},
     sol_types::SolEvent,
-    transports::http::{Client, Http},
-    pubsub::PubSubFrontend,
+    transports::{http::{Client, Http}, BoxTransport}
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -90,7 +89,7 @@ impl Pool {
 }
 
 pub async fn load_pools(
-    provider: RootProvider<PubSubFrontend>,
+    provider: RootProvider<BoxTransport>,
     path: &Path,
     from_block: u64,
     chunk: u64,
@@ -228,7 +227,7 @@ pub async fn load_pools(
 
 
 async fn get_pool_data(
-    provider: RootProvider<PubSubFrontend>,
+    provider: RootProvider<BoxTransport>,
     from_block: u64,
     to_block: u64,
     sig_hash: Vec<FixedBytes<32>>,
