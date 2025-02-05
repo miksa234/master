@@ -6,6 +6,7 @@ from .config import DEVICE
 from .mcts import MCTS
 from .resnet import ResNet
 from .alphazero import AlphaZero
+from .utils import *
 
 import networkx as nx
 import pandas as pd
@@ -26,27 +27,20 @@ logger = logging.getLogger('rl_circuit')
 
 
 def run():
-    pools = pd.read_csv(
-        './data/filtered_pools.csv',
-#        index_col=0,
-        names=["index", "addess", "version", "token0", "token1", "fee", "block_number", "timestamp", "tickspacing"]
-    ).sort_index().drop_duplicates()[:25]
-    tokens = pd.read_csv(
-        './data/filtered_tokens.csv',
-        index_col=0,
-        names=["index", "address", "name", "symbol", "decimals"]
-    ).sort_index().drop_duplicates()
 
-    t0t1 = pools[['token0', 'token1']].to_numpy()
-    edge_list = []
-    cache = []
-    for (t0, t1) in t0t1:
-        k = 0
-        for e in cache:
-            if (t0, t1) == e or (t1, t0) == e:
-                k += 1
-        edge_list.append((t0, t1, {'k': k}))
-        cache.append((t0, t1))
+
+    pools, tokens = load_pools_and_tokens(
+        '../data/pools_liq_degree_filter.csv',
+        '../data/tokens_degree_filter.csv',
+    )
+
+    prices = pd.read_parquet(
+        '../data/prices.parquet'
+    )
+
+    latest_prices = prices[prices['block_number'] == prices['block_number'].max()]
+
+    edge_list = pools_to_edge_list(pools)
 
     G = nx.MultiDiGraph()
     G.add_edges_from(edge_list)
@@ -62,6 +56,7 @@ def run():
     L = nx.line_graph(G, create_using=nx.Graph)
     nx.set_node_attributes(L, {(e[0], e[1], e[2]['k']): e[2]['weight'] for e in G.edges(data=True)}, name='mexr')
     line_mapping = {}
+
     for i, node in enumerate(list(L.nodes())):
         line_mapping[node] = i
     L = nx.relabel_nodes(L, line_mapping)

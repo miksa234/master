@@ -2,45 +2,37 @@ use alloy::{
     eips::BlockId,
     primitives::{Address, U256},
     providers::RootProvider,
-    pubsub::PubSubFrontend,
+    pubsub::PubSubFrontend, transports::BoxTransport,
 };
 use arrow::{
-    array::ArrayRef,
-    datatypes::{DataType, Field, Schema},
-    record_batch::RecordBatch
+    array::ArrayRef, datatypes::{DataType, Field, Schema}, record_batch::RecordBatch
 };
 use parquet::{
-    arrow::ArrowWriter,
-    file::properties::WriterProperties
+    arrow::{arrow_reader::ParquetRecordBatchReaderBuilder, ArrowWriter}, basic::Compression, file::properties::{EnabledStatistics, WriterProperties}
 };
 use indicatif::{ProgressBar, ProgressStyle};
 use std::{
     collections::BTreeMap,
-    fs::OpenOptions,
+    fs::{OpenOptions, File},
     path::Path,
     sync::Arc
 };
 use log::info;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 use crate::{interfaces::*, pools::{Pool, Version}};
 
 pub struct Price {
     pool: Address,
     block: u64,
-    price: U256
+    r_t0: Option<U256>,
+    r_t1: Option<U256>,
+    spx96: Option<U256>,
 }
 
-/*
-    Price (marginal exchange rate) of the token is either
-        token0/token1 or token1/token0
-    It is determined by the decimals of the token
-    the denominator needs to have less decimals then the
-    numerator.
-*/
 
 pub async fn load_prices(
-    provider: RootProvider<PubSubFrontend>,
+    provider: RootProvider<BoxTransport>,
     pools: &BTreeMap<Address, Pool>,
     from_block: u64,
     to_block: u64,
@@ -50,21 +42,6 @@ pub async fn load_prices(
 
     let mut prices = Vec::new();
 
-    let file = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .create(true)
-        .open(path)
-        .unwrap();
-
-    let schema = Schema::new(Vec::from([
-        Field::new("pool_address", DataType::Utf8, false),
-        Field::new("block_number", DataType::Int64, false),
-        Field::new("price", DataType::Utf8, false),
-    ]));
-
-    let props = WriterProperties::builder().build();
-    let mut writer = ArrowWriter::try_new(file, Arc::new(schema.clone()), Some(props)).unwrap();
 
     let mut blocks = Vec::new();
     blocks.push(from_block);
@@ -96,18 +73,16 @@ pub async fn load_prices(
                     match get_v2_price(
                         provider.clone(),
                         block,
-                        pool.address,
-                        pool.token0,
-                        18, // placeholder
-                        pool.token1,
-                        18 // placeholder
+                        pool,
                     ).await {
                         Ok(price) => {
                             prices.push(
                                 Price {
                                     pool: pool.address,
                                     block,
-                                    price
+                                    r_t0: Some(price.0),
+                                    r_t1: Some(price.1),
+                                    spx96: None,
                                 }
                             );
                         }
@@ -121,14 +96,16 @@ pub async fn load_prices(
                     match get_v3_price(
                         provider.clone(),
                         block,
-                        pool.address,
+                        pool
                     ).await {
                         Ok(price) => {
                             prices.push(
                                 Price {
                                     pool: pool.address,
                                     block,
-                                    price
+                                    r_t0: Some(price.0),
+                                    r_t1: Some(price.1),
+                                    spx96: Some(price.2),
                                 }
                             );
                         }
@@ -143,16 +120,30 @@ pub async fn load_prices(
         pb.inc(1)
     }
 
-    let batch = create_record_batch(&prices, schema).unwrap();
+    let file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(path)
+        .unwrap();
+
+    let props = WriterProperties::builder()
+        .set_compression(Compression::SNAPPY)
+        .set_statistics_enabled(EnabledStatistics::None)
+        .build();
+
+    let batch = create_record_batch(&prices).unwrap();
+    println!("{:?}", batch.schema());
+
+    let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props)).unwrap();
     writer.write(&batch).unwrap();
-    let _ = writer.close().unwrap();
+    writer.close().unwrap();
 
     Ok(prices)
 }
 
 fn create_record_batch(
     prices: &Vec<Price>,
-    schema: Schema,
 ) -> Result<RecordBatch> {
 
     let pools = prices.iter()
@@ -163,90 +154,109 @@ fn create_record_batch(
         .map(|p| p.block as i64)
         .collect::<Vec<i64>>();
 
-    let prices_vec = prices.iter()
-        .map(|p| format!("{:?}", p.price))
-        .collect::<Vec<String>>();
+    let r_t0s = prices.iter()
+        .map(|p| match p.r_t0{
+            Some(r) => Some(format!("{:?}", r)),
+            None => None,
+        }).collect::<Vec<Option<String>>>();
 
-    let batch = RecordBatch::try_new(
-        Arc::new(schema),
-        Vec::from([
-            Arc::new(arrow::array::StringArray::from(pools)) as ArrayRef,
-            Arc::new(arrow::array::Int64Array::from(blocks)) as ArrayRef,
-            Arc::new(arrow::array::StringArray::from(prices_vec)) as ArrayRef
-        ])
-    )?;
+    let r_t1s = prices.iter()
+        .map(|p| match p.r_t1{
+            Some(r) => Some(format!("{:?}", r)),
+            None => None,
+        })
+        .collect::<Vec<Option<String>>>();
+
+    let spx96s = prices.iter()
+        .map(|p| match p.spx96 {
+            Some(r) => Some(format!("{:?}", r)),
+            None => None,
+        })
+        .collect::<Vec<Option<String>>>();
+
+    let batch = RecordBatch::try_from_iter(
+        vec![
+            ("pool_address", Arc::new(arrow::array::StringArray::from(pools)) as ArrayRef),
+            ("block_number", Arc::new(arrow::array::Int64Array::from(blocks)) as ArrayRef),
+            ("reserve_t0", Arc::new(arrow::array::StringArray::from(r_t0s)) as ArrayRef),
+            ("reserve_t1", Arc::new(arrow::array::StringArray::from(r_t1s)) as ArrayRef),
+            ("sqrt_price_x96", Arc::new(arrow::array::StringArray::from(spx96s)) as ArrayRef),
+        ]
+    ).unwrap();
 
     Ok(batch)
 }
 
 async fn get_v2_price(
-    provider: RootProvider<PubSubFrontend>,
+    provider: RootProvider<BoxTransport>,
     block_number: u64,
-    pool: Address,
-    token0: Address,
-    decimals_t0: u8,
-    token1: Address,
-    decimals_t1: u8,
-) -> Result<U256> {
+    pool: &Pool,
+) -> Result<(U256, U256)> {
 
     let block = BlockId::from(block_number);
 
-    let token0_ierc20 = IERC20::new(token0, &provider); // token1
-    let token1_ierc20 = IERC20::new(token1, &provider); // token1
+    let token0_ierc20 = IERC20::new(pool.token0, &provider); // token1
+    let token1_ierc20 = IERC20::new(pool.token1, &provider); // token1
 
-    let balance_token0 = token0_ierc20
-        .balanceOf(pool)
+    let balance_token0 = match token0_ierc20
+        .balanceOf(pool.address)
         .block(block)
         .call()
-        .await
-        .unwrap()
-        .balance;
+        .await {
+            Ok(r) => r.balance,
+            Err(e) => { return Err(anyhow!("Error getting balance_token0 {:?}", e)); }
+    };
 
-    let balance_token1 = token1_ierc20
-        .balanceOf(pool)
+    let balance_token1 = match token1_ierc20
+        .balanceOf(pool.address)
         .block(block)
         .call()
-        .await
-        .unwrap()
-        .balance;
+        .await {
+            Ok(r) => r.balance,
+            Err(e) => { return Err(anyhow!("Error getting balance_token1 {:?}", e)); }
+    };
 
-    let price;
-    if decimals_t0 > decimals_t1 {
-        // t0/t1
-        price = balance_token0.checked_div(balance_token1).unwrap();
-    } else {
-        // t1/t0
-        price = balance_token1.checked_div(balance_token0).unwrap();
-    }
-
-    return Ok(price);
+    return Ok((balance_token0, balance_token1));
 }
 
 async fn get_v3_price(
-    provider: RootProvider<PubSubFrontend>,
+    provider: RootProvider<BoxTransport>,
     block_number: u64,
-    pool: Address,
-) -> Result<U256> {
+    pool: &Pool,
+) -> Result<(U256, U256, U256)> {
 
     let block = BlockId::from(block_number);
 
-    let pool_int = IUniswapV3Pool::new(pool, &provider); // token1
-    let sqrt_price_x96 = pool_int
+    let token0_ierc20 = IERC20::new(pool.token0, &provider); // token1
+    let token1_ierc20 = IERC20::new(pool.token1, &provider); // token1
+    let pool_int = IUniswapV3Pool::new(pool.address, &provider); // token1
+
+
+    let balance_token0 = match token0_ierc20
+        .balanceOf(pool.address)
+        .block(block)
+        .call()
+        .await {
+            Ok(r) => r.balance,
+            Err(e) => { return Err(anyhow!("Error getting balance_token0 {:?}", e)); }
+    };
+    let balance_token1 = match token1_ierc20
+        .balanceOf(pool.address)
+        .block(block)
+        .call()
+        .await {
+            Ok(r) => r.balance,
+            Err(e) => { return Err(anyhow!("Error getting balance_token1 {:?}", e)); }
+    };
+
+    let sqrt_price_x96 = match pool_int
         .slot0()
         .block(block)
         .call()
-        .await
-        .unwrap()
-        .sqrtPriceX96;
+        .await {
+        Ok(r) => U256::from(r.sqrtPriceX96),
+        Err(e) => { return Err(anyhow!("Error returning sqrt_price_x96 {:?}", e)); }
+    };
 
-    // sqrt_price_x96 = sqrt(token0/token1) * 2**96
-    // price = sqrt_price_x96**2 / 2**192
-    let price = U256::from(sqrt_price_x96)
-        .pow(U256::from(2))
-        .checked_div(
-            U256::from(2).pow(U256::from(192))
-        ).unwrap();
-    let price = U256::ZERO;
-
-    return Ok(price);
+    return Ok((balance_token0, balance_token1, sqrt_price_x96));
 }

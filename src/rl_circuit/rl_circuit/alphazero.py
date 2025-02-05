@@ -87,7 +87,8 @@ class AlphaZero:
             value_outs, policy_outs = [], []
             for s in states:
                 v, p = self.model(
-                    *self.game.encode_state(s)
+                    self.game.encode_state(s),
+                    self.game.data.edge_list
                 )
                 value_outs += v
                 policy_outs += p

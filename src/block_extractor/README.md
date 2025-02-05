@@ -6,7 +6,7 @@ capped by rpc requests. Create an .env file and fill in the HTTP_URL of your
 node e.g.:
 
 ~/.env
-HTTP="localhost:9999"
+HTTP_URL="https://eth-mainnet.public.blastapi.io"
 
 
 If you want logging add RUST_LOG=INFO to the .env file.
