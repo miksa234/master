@@ -5,7 +5,7 @@ from .game import NetGame
 from .config import DEVICE
 from .mcts import MCTS
 from .resnet import ResNet
-from .alphazero import AlphaZero
+from .rlearn import AgentRLearn
 from .utils import *
 
 import networkx as nx
@@ -35,36 +35,21 @@ def run():
     )
 
     prices = pd.read_parquet(
-        '../data/prices.parquet'
+        '../data/prices_liq_filter.parquet'
     )
+    num_blocks = len(set(prices['block_number']))
 
-    latest_prices = prices[prices['block_number'] == prices['block_number'].max()]
-
-    edge_list = pools_to_edge_list(pools)
-
-    G = nx.MultiDiGraph()
-    G.add_edges_from(edge_list)
-
-    for _, _, w in G.edges(data=True):
-        w['weight'] = round(np.random.uniform(0.7, 1.4), 4)
-
-    normal_mapping = {}
-    for i, node in enumerate(list(G.nodes())):
-        normal_mapping[node] = i
-    G = nx.relabel_nodes(G, normal_mapping)
+    G = make_token_graph(pools, prices)
+    G, token_mapping = linear_node_relabel(G)
 
     L = nx.line_graph(G, create_using=nx.Graph)
     nx.set_node_attributes(L, {(e[0], e[1], e[2]['k']): e[2]['weight'] for e in G.edges(data=True)}, name='mexr')
-    line_mapping = {}
-
-    for i, node in enumerate(list(L.nodes())):
-        line_mapping[node] = i
-    L = nx.relabel_nodes(L, line_mapping)
+    L, line_mapping = linear_node_relabel(L)
 
     edges = list(G.edges(data=True))
     for (t0, t1, d) in edges:
-        G.add_edge(t1, t0, k=d['k'], weight=1/d['weight'])
-
+        inverse_weights = [1/el for el in d['weight']]
+        G.add_edge(t1, t0, k=d['k'], weight=inverse_weights)
 
 #    weights = np.random.uniform(0.01, 100, size=(6, 6))
 #    weights = np.triu(1/weights, k=0) + np.tril(weights.T, k=0)
@@ -97,28 +82,24 @@ def run():
 
     # pool attributes
     edge_list = [list(e) for e in L.edges()]
-    rates = [e[-1]['mexr'] for e in L.nodes(data=True)]
+    rates = np.array([e[-1]['mexr'] for e in L.nodes(data=True)]).T
     fees = [0.003 for _ in range(len(L.nodes))]
     used = [0 for _ in range(len(L.nodes))]
     t0_using = [0 for _ in range(len(L.nodes))]
     t1_using = [0 for _ in range(len(L.nodes))]
 
-    node_attr  = torch.tensor(np.dstack([rates, fees, used, t0_using, t1_using])).float().squeeze(0)
+    node_attr  = torch.tensor(np.dstack([*rates, fees, used, t0_using, t1_using])).float().squeeze(0)
     edge_index = torch.tensor(edge_list).t().contiguous()
 
     data = Data(x=node_attr, edge_index=edge_index).to(DEVICE)
 
-
-
-    ## Just scramble code to test if shit works
-
     args = {
-        'C': 10,
-        'num_searches': 10,
-        'num_iterations': 2,
-        'num_self_play_iterations': 50,
-        'num_parallel': 10,
-        'num_epochs': 4,
+        'C': 1.5,
+        'num_iterations': 50,
+        'num_searches': 600,
+        'num_self_play_iterations': 500,
+        'num_parallel': 100,
+        'num_epochs': 10,
         'batch_size': 128,
         'temperature': 1.25,
         'eps': 0.25,
@@ -126,8 +107,7 @@ def run():
         'num_processes': 5,
     }
 
-    game = NetGame(G, data, line_mapping)
-
+    game = NetGame(G, data, line_mapping, num_blocks)
 
     model = ResNet(
         in_channels=5,
@@ -136,20 +116,12 @@ def run():
         num_layers=3
     ).to(DEVICE).share_memory()
 
-    state = [(0, 0, 0), (0, 1, 0), (1, 2, 0)]
-    value, policy = [], []
-    v, p = model(
-        game.encode_state(state),
-        edge_index
-    )
-
-
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.0001)
 
     mcts = MCTS(game, args, model)
 
-    alpha_zero = AlphaZero(model, optimizer, game, args)
-    alpha_zero.learn()
+    rlearn = AgentRLearn(model, optimizer, game, args)
+    rlearn.learn()
 
 #    model.load_state_dict(torch.load('./model/model_7.pt', weights_only=True))
 #    model.eval()
@@ -177,6 +149,13 @@ def run():
 
 
 #   TEST
+#    state = [(0, 0, 0), (0, 1, 0), (1, 2, 0)]
+#    value, policy = [], []
+#    e_x = game.encode_state(state)
+#    v, p = model(
+#        e_x,
+#        data.edge_index
+#    )
 #    state = [(0, 0, 0)]
 #    while True:
 #        print("state: ", state)
