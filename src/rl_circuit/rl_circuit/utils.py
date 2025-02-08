@@ -96,7 +96,10 @@ def pools_to_edge_list(pools, prices):
         for e in cache:
             if (t0, t1) == e or (t1, t0) == e:
                 k += 1
-        edge_list.append((t0, t1, {'k': k, 'weight': p}))
+        edge_list.append(
+            (t0, t1,
+             {'k': k, 'weight': p, 'address': pool['address'], 'fee': int(pool['fee'])/10e6})
+        )
         cache.append((t0, t1))
     return edge_list
 

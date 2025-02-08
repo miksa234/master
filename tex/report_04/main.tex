@@ -1,0 +1,133 @@
+\include{./preamble.tex}
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+% Node styles
+\tikzstyle{new style 0}=[fill={rgb,255: red,128; green,128; blue,128},
+draw=black, shape=circle, inner sep=0.5mm]
+\tikzstyle{1}=[fill=white, draw=black, shape=circle, font=\scriptsize,
+        inner sep=0.5mm, outer sep=0.5mm, minimum width=0.5mm]
+
+% Edge styles
+\tikzstyle{new edge style 0}=[-, draw={rgb,255: red,191; green,191; blue,191}, ultra thin]
+\tikzstyle{new edge style 1}=[-, draw={rgb,255: red,191; green,0; blue,64},
+ultra thick]
+\tikzstyle{new edge style 2}=[-, draw={rgb,255: red,191; green,0; blue,64}, in=60, out=120, dotted]
+
+\begin{document}
+
+\maketitle
+
+\section{Learning Setup}
+This report will describe the reinforcement learning algorithm and environment
+of the agent that is used to find the optimal path in the arbitrage routing
+problem. Firstly the learning framework is described, that is the agent and the
+environment. Secondly the reinforcement learning algorithm together with the
+used graph neural networks is described.
+
+\subsection{Agent and Environment}
+Firstly the framework (or the game) the agent is trying to learn is finding the
+path in a graph that does not use repeated edges (trail) and starts and ends at
+the same node (circular). The graph represents ERC20 \cite{erc20} tokens as
+vertices and decentralized exchange pools as edges. Each pool has a swap fee,
+which usually is in the range of $0.3\%-1\%$, and a marginal exchange rate. The
+marginal exchange rate, unique to the pool, is inversely bidirectional. While
+swapping token $0$ for token $1$ in the pool the usual marginal exchange rate
+is used, but when swapping from token $1$ to token $0$ the inverse marginal
+exchange rate is used. `Used' here is meant in the context of the learning
+setting, in the actual setting the automated market maker formula is used to
+determine the amount exchanged.
+\newline
+
+The agents objective is to find the path that maximizes the profit and ends,
+where it started. Starting from the given vertex (token) the agent chooses
+actions from a set of valid actions. Actions are moves to the next vertex via
+an edge (pool). The valid actions rule out the edges that have been used
+already. The idea behind this is the following. If there is an arbitrage
+opportunity, and the trades are conducted in a chronological order, at each
+swap the pool's `capacity' will be exerted and the pool's exchange rate will in
+balance with the overall market. Hence, the pool is not used again.
+\newline
+
+When the agent arrives at a terminal state, there are two possibilities.
+Firstly the agent has arrived back to its starting point, where the product of
+the exchange rates is calculated to give the profit of the walk. In this case
+also at each trade a trading penalty is utilized to account for the fees of
+each transaction. Secondly the agent arrives at a dead end, meaning the agent has
+not reached the starting point and has no valid actions left.
+
+\subsubsection{Rewards}
+At a terminal state the agent is rewarded a different amount. In the case the
+agent is at a dead end the reward is
+\begin{align}
+    r_L = -1.
+\end{align}
+In the case the agent ends back up at the origin the reward is the sum of the
+logarithm of the marginal exchange rates $Z_p$ in the path $P$ and the trade
+penalty $\tau$. Additionally, the reward is adjusted by a win-loss multiplier $M$
+\begin{align}
+    r_W = M \cdot \sum_{p \in P} \log(Z_p \cdot \tau)
+\end{align}
+The idea behind using the sum of the logarithm of the marginal exchange rates
+is that it is already reformulated to account if the sequence of trades will be
+a loss or a win. A sequence of trades will be a win if the product of the
+marginal exchange rates is bigger than $1$ and a loss if it is smaller. The
+logarithm will be positive for a profitable trade and negative for a
+nonprofitable one. Another reason for using the logarithm is to adjust for the
+high discrepancy of the marginal exchange rates between the pools.
+
+\subsection{Deep Graph Neural Network}
+The idea is to train a model that is general in the sense that it can be used
+on smaller or bigger graphs, graphs of different size. Encoding the state and
+pushing it through a traditional Deep NN will give us the same policy dimension
+every time. Instead, the aim is to always get a policy vector that has the size
+of two times the amount of pools, since the agent can move in both directions.
+This is essentially the same amount as the edges in the graph. The next idea is
+to use a graph neural network, but the output is  policy vector of the size of
+the number of vertices in the graph, which have no connection to the number of
+edges in the graph. To make the model more general the model will be trained on
+a graph neural network of the line graph of the problem graph. The line graph
+of a graph has vertex for each edge in the actual graph. Two vertices are
+connected by an edge if and only if their edges in the actual graph share a
+common endpoint. Each vertex (pool) in the line graph will have five attributes:
+\begin{itemize}
+    \item Marginal exchange rate
+    \item Pool swap fee
+    \item Binary entry if used or not
+    \item Binary entry if the agent is currently at token0 of this pool
+    \item Binary entry if the agent is currently at token1 of this pool
+\end{itemize}
+The encoder computes the node embeddings $h_i^{0}$ through a learned linear
+projection to dimension $d_h = 128$. The embeddings are then updated via. $N$
+Residual Multihead Attention Layers \cite{gatv2}. An updated formula for the
+attention weights is used, rather than the one from the original paper
+\cite{gan_velickovic}. Each layer consists of two sublayers, a multihead
+attention layer (GAT) for message passing between the nodes which is flattened
+by a linear connection back to the original dimension $d_h$ and a node-wise
+fully connected feed-forward layer (FF). Both sublayers have a Batch Norm (BN)
+and a residual connection similar to \cite{rl_coopt}. The following is a sketch
+of the residual block
+\begin{align}
+    \hat{h}_{i} &= \text{BN}^{l}\left( h_i^{(l-1)}
+    + \text{GAT}_i^{l}(h_1^{(l-1)},\ldots,h_n^{(l-1)})\right)\\
+    h_i^{(l)} &= \text{BN}^{l}\left( \hat{h}_{i} + \text{FF}_i^{l}(\hat{h}_i) \right).
+\end{align}
+The decoder has two heads, the policy head and the value head as in
+\cite{alphazero}. The policy head has a graph multihead attention layer with
+Batch Norm forwarded to a linear layer, which expands the output per node by
+two with a Relu activation function. The value head has also a graph multihead
+attention layer fed through a linear.
+\subsection{Training}
+
+
+\section{Data}
+
+\section{Code}
+The code and training can be checked on my Github \cite{github}
+
+
+\nocite{github}
+\nocite{gatv2}
+\nocite{gan_velickovic}
+\printbibliography
+
+\end{document}

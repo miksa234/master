@@ -7,6 +7,7 @@ from .mcts import MCTS
 from .resnet import ResNet
 from .rlearn import AgentRLearn
 from .utils import *
+from .brute_force import *
 
 import networkx as nx
 import pandas as pd
@@ -44,18 +45,31 @@ def run():
 
     L = nx.line_graph(G, create_using=nx.Graph)
     nx.set_node_attributes(L, {(e[0], e[1], e[2]['k']): e[2]['weight'] for e in G.edges(data=True)}, name='mexr')
+    nx.set_node_attributes(L, {(e[0], e[1], e[2]['k']): e[2]['fee'] for e in G.edges(data=True)}, name='fee')
+    nx.set_node_attributes(L, {(e[0], e[1], e[2]['k']): e[2]['address'] for e in G.edges(data=True)}, name='address')
+
     L, line_mapping = linear_node_relabel(L)
 
     edges = list(G.edges(data=True))
     for (t0, t1, d) in edges:
         inverse_weights = [1/el for el in d['weight']]
-        G.add_edge(t1, t0, k=d['k'], weight=inverse_weights)
+        G.add_edge(t1, t0, k=d['k'], weight=inverse_weights, address=d['address'])
+
 
 #    weights = np.random.uniform(0.01, 100, size=(6, 6))
 #    weights = np.triu(1/weights, k=0) + np.tril(weights.T, k=0)
 #    weights = np.log(weights)
 #    np.fill_diagonal(weights, 0)
 #    G = nx.from_numpy_array(weights, create_using=nx.DiGraph)
+#    print(len(G.edges))
+#
+#    trails, dw = brute_force_search_trail(G, 0)
+#    for trail, w in zip(trails, dw):
+#        print(trail)
+#
+#    exit()
+
+
 
 
 # pool attributes: (edge_attributes)
@@ -83,7 +97,7 @@ def run():
     # pool attributes
     edge_list = [list(e) for e in L.edges()]
     rates = np.array([e[-1]['mexr'] for e in L.nodes(data=True)]).T
-    fees = [0.003 for _ in range(len(L.nodes))]
+    fees = [e[-1]['fee'] for e in L.nodes(data=True)]
     used = [0 for _ in range(len(L.nodes))]
     t0_using = [0 for _ in range(len(L.nodes))]
     t1_using = [0 for _ in range(len(L.nodes))]
@@ -93,21 +107,25 @@ def run():
 
     data = Data(x=node_attr, edge_index=edge_index).to(DEVICE)
 
+    game = NetGame(G, data, line_mapping, num_blocks)
+
     args = {
-        'C': 1.5,
+        'C': 3.5,
+        'C_1/3' : 3.5,
+        'C_2/3' : 2.0,
+        'C_3/3' : 1.5,
         'num_iterations': 50,
-        'num_searches': 600,
-        'num_self_play_iterations': 500,
-        'num_parallel': 100,
+        'num_searches': len(game.edges)//2,
+        'num_self_play_iterations': len(game.edges),
+        'num_parallel': len(game.edges)//5,
         'num_epochs': 10,
         'batch_size': 128,
         'temperature': 1.25,
         'eps': 0.25,
         'dirichlet_alpha': 0.3,
         'num_processes': 5,
+        'multicore': False,
     }
-
-    game = NetGame(G, data, line_mapping, num_blocks)
 
     model = ResNet(
         in_channels=5,
@@ -122,8 +140,16 @@ def run():
 
     rlearn = AgentRLearn(model, optimizer, game, args)
     rlearn.learn()
+    exit()
 
-#    model.load_state_dict(torch.load('./model/model_7.pt', weights_only=True))
+#    model.load_state_dict(
+#        torch.load(
+#            './model/model_30.pt',
+#            weights_only=True,
+#            map_location=DEVICE
+#        )
+#    )
+
 #    model.eval()
 #    for s in game.nodes:
 #        state = [(s, s, 0)]

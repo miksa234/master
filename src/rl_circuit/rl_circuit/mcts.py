@@ -359,6 +359,8 @@ class MCTSParallel:
 
     Methods
     -------
+    set_C(C):
+        Sets the exploration parameter for the MCTS.
     search(states, p_memory):
         Performs the parallel MCTS search from the given states.
     """
@@ -367,6 +369,18 @@ class MCTSParallel:
         self.args = args
         self.model = model
 
+    def set_C(self, C):
+        """
+        Set the exploration parameter for the MCTS algorithm.
+
+        Parameters
+        ----------
+        self : object
+            The instance of the class.
+        C : float
+            The exploration parameter to be set.
+        """
+        self.args['C'] = C
 
     @torch.no_grad()
     def search(self, states, p_memory):

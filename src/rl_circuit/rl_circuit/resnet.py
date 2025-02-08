@@ -45,7 +45,9 @@ class ResNet(nn.Module):
     ):
         super().__init__()
 
-        self.in_block = ResBlock(in_channels, emb_channels, num_heads)
+        self.encoder = Linear(in_channels, emb_channels)
+
+        self.in_block = ResBlock(emb_channels, emb_channels, num_heads)
 
         self.hidden_blocks = nn.ModuleList()
         for _ in range(num_layers-1):
@@ -87,7 +89,8 @@ class ResNet(nn.Module):
         tuple
             A tuple containing the value estimation and policy logits.
         """
-        x = self.in_block(node_attr, edge_index)
+        x = self.encoder(node_attr)
+        x = self.in_block(x, edge_index)
         for block in self.hidden_blocks:
             x = block(x, edge_index)
 
@@ -122,9 +125,10 @@ class ResBlock(nn.Module):
         super().__init__()
         self.in_layer = Sequential('x, edge_index', [
             (GATv2Conv(in_channels, emb_channels, heads=num_heads), 'x, edge_index -> x'),
-            BatchNorm(emb_channels*num_heads),
             Linear(emb_channels*num_heads, emb_channels, bias=False)
         ])
+
+        self.batch_norm1 = BatchNorm(emb_channels)
 
         self.feed_forward = nn.Sequential(
             Linear(emb_channels, 512),
@@ -149,7 +153,9 @@ class ResBlock(nn.Module):
         Tensor
             Output tensor after applying the residual block.
         """
+        res = node_attr
         x = self.in_layer(node_attr, edge_index)
+        x = self.batch_norm1(res + x)
 
         res = x
         x = self.feed_forward(x)

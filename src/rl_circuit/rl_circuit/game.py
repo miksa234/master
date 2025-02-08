@@ -172,7 +172,7 @@ class NetGame:
             value = 0
             terminated = True
         if len(state) <= 1 and len(valid_actions) == 0:
-            value = -30
+            value = -1
             terminated = True
         if len(state) <= 1 and len(valid_actions) > 0:
             value = 0

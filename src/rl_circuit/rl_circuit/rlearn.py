@@ -149,34 +149,56 @@ class AgentRLearn:
             loss.backward()
             self.optimizer.step()
 
+    def adapt_exploration_parameter(self, iteration):
+        """
+        Adapts the exploration parameter of MCTS based on the current iteration.
+
+        Parameters
+        ----------
+        iteration : int
+            The current iteration number.
+        """
+        if iteration <= self.args['num_iterations']:
+            self.mcts.set_C(self.args['C_3/3'])
+
+        if iteration <= self.args['num_iterations']*2//3:
+            self.mcts.set_C(self.args['C_2/3'])
+
+        if iteration <= self.args['num_iterations']//3:
+            self.mcts.set_C(self.args['C_1/3'])
+
+
     def learn(self):
+        """
+        Main loop for the learning process, including self-play and training.
+        """
         for iteration in range(self.args['num_iterations']):
             logger.info(f"Iterations {iteration+1}/{self.args['num_iterations']}")
+
+            self.adapt_exploration_parameter(iteration)
+
             memory = []
-
             self.model.eval()
+            if not self.args['multicore']:
+                # single core self-play
+                for play_iter in tqdm(range(self.args['num_self_play_iterations']//self.args['num_parallel']), desc="self_play"):
+                    memory += self.self_play()
+            else:
+                # multicore self-play
+                play_iter = self.args['num_self_play_iterations']
+                num_parallel = self.args['num_parallel']
+                num_processes = self.args['num_processes']
+                per_processor = play_iter//num_parallel//num_processes
+                # at each self play choose prices from a different block number
+                with mp.Pool(processes=num_processes) as pool:
+                    results = pool.starmap(
+                        self_play_num_times,
+                        [(self, per_processor) for _ in range(num_processes)]
+                    )
+                    pool.terminate()
 
-            start = time.time()
-            for play_iter in tqdm(range(self.args['num_self_play_iterations']//self.args['num_parallel']), desc="self_play"):
-                memory += self.self_play()
-            end = time.time()
-            logger.info(f"normal execution {end-start}")
-
-#            Parallel self play
-#            play_iter = self.args['num_self_play_iterations']
-#            num_parallel = self.args['num_parallel']
-#            num_processes = self.args['num_processes']
-#            per_processor = play_iter//num_parallel//num_processes
-#            # at each self play choose prices from a different block number
-#            with mp.Pool(processes=num_processes) as pool:
-#                results = pool.starmap(
-#                    self_play_num_times,
-#                    [(self, per_processor) for _ in range(num_processes)]
-#                )
-#                pool.terminate()
-#
-#            for result in results:
-#                memory += result
+                for result in results:
+                    memory += result
 
             self.model.train()
             for epoch_iter in tqdm(range(self.args['num_epochs']), desc="epochs"):
