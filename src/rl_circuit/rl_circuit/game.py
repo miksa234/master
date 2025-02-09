@@ -53,6 +53,7 @@ class NetGame:
             data,
             line_mapping,
             num_blocks,
+            args,
             current_block=-1
     ):
         """
@@ -72,6 +73,7 @@ class NetGame:
             The current block index (default is -1).
         """
         self.G = G
+        self.args = args
         self.edges = {(i, j, w['k']): w['weight'] for i, j, w in G.edges(data=True)}
         self.nodes = list(G.nodes)
         self.edge_list = list(self.edges.keys())
@@ -179,10 +181,8 @@ class NetGame:
             terminated = False
 
         if self.check_terminal(state):
-            trade_penalty = np.log(1 - 0.01) # 1 percent of the trade
             edge_list = state[1:]
-            win_loss_amplifier = 1
-            value = np.sum([np.log(self.edges[edge][self.current_block])+trade_penalty for edge in edge_list])*win_loss_amplifier
+            value = np.sum([np.log(self.edges[edge][self.current_block]*self.args['tau']) for edge in edge_list])*self.args['M']
             terminated = True
         return value, terminated
 

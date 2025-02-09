@@ -122,7 +122,14 @@ class AgentRLearn:
         np.random.shuffle(memory)
         for batch_idx in range(0, len(memory), self.args['batch_size']):
             sample = memory[batch_idx:np.min([len(memory) - 1, batch_idx + self.args['batch_size']])]
-            states , policy_targets, value_targets, block_indices = zip(*sample)
+            try:
+                states , policy_targets, value_targets, block_indices = zip(*sample)
+            except ValueError:
+                print(f"batch_idx {batch_idx}")
+                print(f"From-TO : {[batch_idx, np.min([len(memory) - 1, batch_idx + self.args['batch_size']])]}")
+                print(f"len memory {len(memory)}")
+                print(f"len sample {len(sample)}")
+                continue
 
             policy_targets, value_targets = np.array(policy_targets), np.array(value_targets)
             policy_targets, value_targets = torch.tensor(policy_targets).to(DEVICE).float(), torch.tensor(value_targets).to(DEVICE).float()

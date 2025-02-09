@@ -69,9 +69,6 @@ def run():
 #
 #    exit()
 
-
-
-
 # pool attributes: (edge_attributes)
 #     * marginal exchange rate of the pool from t0 -> t1 (t1/t0)
 #     * swap fee = 0.3%
@@ -107,10 +104,15 @@ def run():
 
     data = Data(x=node_attr, edge_index=edge_index).to(DEVICE)
 
-    game = NetGame(G, data, line_mapping, num_blocks)
+    args_game = {
+        'tau': 1,
+        'M': 2,
+    }
+
+    game = NetGame(G, data, line_mapping, num_blocks, args_game)
 
     args = {
-        'C': 3.5,
+        'C': 2,
         'C_1/3' : 3.5,
         'C_2/3' : 2.0,
         'C_3/3' : 1.5,
@@ -124,8 +126,9 @@ def run():
         'eps': 0.25,
         'dirichlet_alpha': 0.3,
         'num_processes': 5,
-        'multicore': False,
+        'multicore': True,
     }
+
 
     model = ResNet(
         in_channels=5,
@@ -136,19 +139,26 @@ def run():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.0001)
 
+#    model.load_state_dict(
+#        torch.load(
+#            './model/model_25.pt',
+#            weights_only=True,
+#            map_location=DEVICE
+#        )
+#    )
+#    optimizer.load_state_dict(
+#        torch.load(
+#            './model/optimizer_24.pt',
+#            weights_only=True,
+#            map_location=DEVICE
+#        )
+#    )
+
     mcts = MCTS(game, args, model)
 
     rlearn = AgentRLearn(model, optimizer, game, args)
     rlearn.learn()
     exit()
-
-#    model.load_state_dict(
-#        torch.load(
-#            './model/model_30.pt',
-#            weights_only=True,
-#            map_location=DEVICE
-#        )
-#    )
 
 #    model.eval()
 #    for s in game.nodes:

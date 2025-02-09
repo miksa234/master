@@ -40,27 +40,27 @@ async fn main() -> Result<()> {
         https_url.as_str()
     ).await?;
 
-    let block_number = BlockId::from(provider.get_block_number().await.unwrap());
-    let from_block_number = 10000835;
-    let chunks = 50000;
-    let (pools, pool_id) = load_pools(
-        provider.clone(),
-        Path::new("../data/pools.csv"),
-        from_block_number,
-        chunks,
-    ).await.unwrap();
-
-    let parallel_tokens = 1;
-    let tokens = load_tokens(
-        provider.clone(),
-        Path::new("../data/tokens.csv"),
-        &pools,
-        parallel_tokens,
-        pool_id,
-    ).await.unwrap();
-
+//    let block_number = BlockId::from(provider.get_block_number().await.unwrap());
+//    let from_block_number = 10000835;
+//    let chunks = 50000;
+//    let (pools, pool_id) = load_pools(
+//        provider.clone(),
+//        Path::new("../data/pools.csv"),
+//        from_block_number,
+//        chunks,
+//    ).await.unwrap();
+//
+//    let parallel_tokens = 1;
+//    let tokens = load_tokens(
+//        provider.clone(),
+//        Path::new("../data/tokens.csv"),
+//        &pools,
+//        parallel_tokens,
+//        pool_id,
+//    ).await.unwrap();
+//
     let filtered_pools = load_pools_from_file(
-        Path::new("../data/pools_degree_filter.csv"),
+        Path::new("../data/pools_liq_degree_filter.csv"),
     ).unwrap();
 
     let filtered_tokens = load_tokens_from_file(
@@ -73,7 +73,7 @@ async fn main() -> Result<()> {
     let p_to_block = provider.get_block_number().await?;
     let p_from_block = 14763568;
     //let p_from_block = p_to_block - 36000*1;
-    let block_gap = 36000; // approx 12 hours
+    let block_gap = 9000; // approx 2 hours
 
     let prices = load_prices(
         provider.clone(),
@@ -81,7 +81,7 @@ async fn main() -> Result<()> {
         p_from_block,
         p_to_block,
         block_gap,
-        Path::new("../data/prices.parquet")
+        Path::new("../data/prices_3h.parquet")
     ).await.unwrap();
 
     info!("Done len prices: {:?}", prices.len());
