@@ -110,7 +110,7 @@ def pools_to_edge_list(pools, prices):
     return edge_list
 
 
-def make_token_graph(pools, latest_prices):
+def make_token_graph(pools, prices):
     """
     Create a token graph from pool and price data.
 
@@ -127,7 +127,7 @@ def make_token_graph(pools, latest_prices):
         A directed multigraph where nodes represent
         tokens and edges represent pools with attributes.
     """
-    edge_list = pools_to_edge_list(pools, latest_prices)
+    edge_list = pools_to_edge_list(pools, prices)
 
     G = nx.MultiDiGraph()
     G.add_edges_from(edge_list)
@@ -148,7 +148,7 @@ def linear_node_relabel(G):
         A tuple containing:
         - G (networkx.MultiDiGraph): The graph with relabeled nodes.
         - mapping (dict): A dictionary mapping the original
-        node labels to the new labels.
+          node labels to the new labels.
     """
     mapping = {}
     for i, node in enumerate(list(G.nodes())):
@@ -158,6 +158,26 @@ def linear_node_relabel(G):
 
 
 def filter_pools_with_no_gradient(pools, prices):
+    """
+    Filter out pools that have no gradient in their price data.
+
+    This function filters the given pool and price data to remove pools
+    where the price gradient is zero, indicating no change in price.
+
+    Parameters
+    ----------
+    pools : pd.DataFrame
+        DataFrame containing pool data
+    prices : pd.DataFrame
+        DataFrame containing price data
+
+    Returns
+    -------
+    tuple
+        A tuple containing two pandas DataFrames:
+        - filtered_pools (pd.DataFrame): DataFrame containing the filtered pool data.
+        - filtered_prices (pd.DataFrame): DataFrame containing the filtered price data.
+    """
     pools = pools[pools['address'].isin(set(prices['pool_address']))]
     mask = []
     for _, pool in pools.iterrows():

@@ -16,7 +16,7 @@ class ResNet(nn.Module):
 
     Parameters
     ----------
-    args: dict
+    args : dict
         in_channels : int
             Number of input channels.
         emb_channels : int
@@ -25,11 +25,15 @@ class ResNet(nn.Module):
             Number of attention heads. Default is 4.
         num_layers : int, optional
             Number of layers in the network. Default is 3.
+        policy_mheads : int
+            Number of attention heads for the policy head.
+        value_mheads : int
+            Number of attention heads for the value head.
 
     Attributes
     ----------
-    in_block : ResBlock
-        Initial residual block.
+    encoder : Linear
+        Linear layer for encoding input features.
     hidden_blocks : nn.ModuleList
         List of hidden residual blocks.
     policy_head : Sequential
@@ -106,13 +110,15 @@ class ResBlock(nn.Module):
 
     Parameters
     ----------
-    args: dict
+    args : dict
         in_channels : int
             Number of input channels.
         emb_channels : int
             Number of embedding channels.
         num_heads : int
             Number of attention heads.
+        ff_dim : int
+            Dimension of the feed-forward network.
 
     Attributes
     ----------
@@ -120,8 +126,10 @@ class ResBlock(nn.Module):
         Initial layer with GATv2Conv, BatchNorm, and Linear layers.
     feed_forward : nn.Sequential
         Feed-forward network with Linear and ReLU layers.
+    batch_norm1 : BatchNorm
+        Batch normalization layer after the initial layer.
     batch_norm2 : BatchNorm
-        Batch normalization layer.
+        Batch normalization layer after the feed-forward network.
     """
     def __init__(self, args):
         super().__init__()
