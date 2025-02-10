@@ -31,22 +31,24 @@ def run():
 
 
     pools, tokens = load_pools_and_tokens(
-        '../data/pools/pools_liq_degree_filter.csv',
-        '../data/tokens/tokens_degree_filter.csv',
+        '../data/pools/pools_deg_15_liq_100_block_18.csv',
+        '../data/tokens/tokens.csv',
     )
-
     prices = pd.read_parquet(
-        '../data/prices/prices_3h.parquet'
+        '../data/prices/prices_deg_15_liq_100_block_18.parquet'
     )
-    num_blocks = len(set(prices['block_number']))
+    pools, prices = filter_pools_with_no_gradient(pools, prices)
 
+    num_blocks = len(set(prices['block_number']))
     G = make_token_graph(pools, prices)
     G, token_mapping = linear_node_relabel(G)
 
     L = nx.line_graph(G, create_using=nx.Graph)
-    nx.set_node_attributes(L, {(e[0], e[1], e[2]['k']): e[2]['weight'] for e in G.edges(data=True)}, name='mexr')
-    nx.set_node_attributes(L, {(e[0], e[1], e[2]['k']): e[2]['fee'] for e in G.edges(data=True)}, name='fee')
-    nx.set_node_attributes(L, {(e[0], e[1], e[2]['k']): e[2]['address'] for e in G.edges(data=True)}, name='address')
+    for e in G.edges(data=True):
+        nx.set_node_attributes(L, {(e[0], e[1], e[2]['k']): e[2]['weight']}, name='mexr')
+        nx.set_node_attributes(L, {(e[0], e[1], e[2]['k']): e[2]['fee']}, name='fee')
+        nx.set_node_attributes(L, {(e[0], e[1], e[2]['k']): e[2]['address']}, name='address')
+
 
     L, line_mapping = linear_node_relabel(L)
 
@@ -54,6 +56,7 @@ def run():
     for (t0, t1, d) in edges:
         inverse_weights = [1/el for el in d['weight']]
         G.add_edge(t1, t0, k=d['k'], weight=inverse_weights, address=d['address'])
+
 
 
 #    weights = np.random.uniform(0.01, 100, size=(6, 6))

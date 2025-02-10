@@ -2,6 +2,7 @@
 
 import pandas as pd
 import networkx as nx
+import numpy as np
 
 
 def load_pools_and_tokens(path_pools, path_tokens):
@@ -24,12 +25,15 @@ def load_pools_and_tokens(path_pools, path_tokens):
     """
     pools = pd.read_csv(
         path_pools,
-        index_col=0,
+        names = ['index', 'address', 'version', 'token0', 'token1', 'fee', 'block_number', 'time_stamp', 'tick_spacing'],
+        header = None,
     ).sort_index().drop_duplicates()
     tokens = pd.read_csv(
         path_tokens,
-        index_col=0,
+        header = None,
+        names = ['index', 'address', 'name', 'symbol', 'decimals']
     ).sort_index().drop_duplicates()
+
 
     return pools, tokens
 
@@ -92,6 +96,7 @@ def pools_to_edge_list(pools, prices):
         t1 = pool['token1']
         p = make_price(prices[prices['pool_address'] == pool['address']])
 
+
         k = 0
         for e in cache:
             if (t0, t1) == e or (t1, t0) == e:
@@ -101,6 +106,7 @@ def pools_to_edge_list(pools, prices):
              {'k': k, 'weight': p, 'address': pool['address'], 'fee': int(pool['fee'])/10e6})
         )
         cache.append((t0, t1))
+
     return edge_list
 
 
@@ -150,5 +156,18 @@ def linear_node_relabel(G):
     G = nx.relabel_nodes(G, mapping)
     return G, mapping
 
+
+def filter_pools_with_no_gradient(pools, prices):
+    pools = pools[pools['address'].isin(set(prices['pool_address']))]
+    mask = []
+    for _, pool in pools.iterrows():
+        t0 = pool['token0']
+        t1 = pool['token1']
+        p = make_price(prices[prices['pool_address'] == pool['address']])
+        mask.append(np.gradient(p).sum() != 0)
+
+    pools = pools[mask]
+    prices = prices[prices['pool_address'].isin(list(pools['address']))]
+    return pools, prices
 
 
