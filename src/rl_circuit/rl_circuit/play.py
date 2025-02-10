@@ -31,12 +31,12 @@ def run():
 
 
     pools, tokens = load_pools_and_tokens(
-        '../data/pools_liq_degree_filter.csv',
-        '../data/tokens_degree_filter.csv',
+        '../data/pools/pools_liq_degree_filter.csv',
+        '../data/tokens/tokens_degree_filter.csv',
     )
 
     prices = pd.read_parquet(
-        '../data/prices_liq_filter.parquet'
+        '../data/prices/prices_3h.parquet'
     )
     num_blocks = len(set(prices['block_number']))
 
@@ -111,15 +111,15 @@ def run():
 
     game = NetGame(G, data, line_mapping, num_blocks, args_game)
 
-    args = {
+    args_training = {
         'C': 2,
         'C_1/3' : 3.5,
         'C_2/3' : 2.0,
         'C_3/3' : 1.5,
-        'num_iterations': 50,
-        'num_searches': len(game.edges)//2,
-        'num_self_play_iterations': len(game.edges),
-        'num_parallel': len(game.edges)//5,
+        'num_iterations': 100,
+        'num_searches': len(game.edges),
+        'num_self_play_iterations': len(game.edges)*2,
+        'num_parallel': len(game.edges)*2//5,
         'num_epochs': 10,
         'batch_size': 128,
         'temperature': 1.25,
@@ -129,12 +129,18 @@ def run():
         'multicore': True,
     }
 
+    args_model = {
+        'in_channels': 5,
+        'emb_channels': 320,
+        'num_heads': 20,
+        'num_layers': 10,
+        'ff_dim': 1280,
+        'policy_mheads': 1,
+        'value_mheads': 1
+    }
 
     model = ResNet(
-        in_channels=5,
-        emb_channels=128,
-        num_heads=8,
-        num_layers=3
+        args_model
     ).to(DEVICE).share_memory()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.0001)
@@ -154,9 +160,9 @@ def run():
 #        )
 #    )
 
-    mcts = MCTS(game, args, model)
+    mcts = MCTS(game, args_training, model)
 
-    rlearn = AgentRLearn(model, optimizer, game, args)
+    rlearn = AgentRLearn(model, optimizer, game, args_training)
     rlearn.learn()
     exit()
 

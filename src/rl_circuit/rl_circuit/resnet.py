@@ -16,14 +16,15 @@ class ResNet(nn.Module):
 
     Parameters
     ----------
-    in_channels : int
-        Number of input channels.
-    emb_channels : int
-        Number of embedding channels.
-    num_heads : int, optional
-        Number of attention heads. Default is 4.
-    num_layers : int, optional
-        Number of layers in the network. Default is 3.
+    args: dict
+        in_channels : int
+            Number of input channels.
+        emb_channels : int
+            Number of embedding channels.
+        num_heads : int, optional
+            Number of attention heads. Default is 4.
+        num_layers : int, optional
+            Number of layers in the network. Default is 3.
 
     Attributes
     ----------
@@ -38,37 +39,38 @@ class ResNet(nn.Module):
     """
     def __init__(
         self,
-        in_channels,
-        emb_channels,
-        num_heads=4,
-        num_layers=3
+        args,
     ):
         super().__init__()
 
-        self.encoder = Linear(in_channels, emb_channels)
-
-        self.in_block = ResBlock(emb_channels, emb_channels, num_heads)
+        self.encoder = Linear(args['in_channels'], args['emb_channels'])
 
         self.hidden_blocks = nn.ModuleList()
-        for _ in range(num_layers-1):
+        for _ in range(args['num_layers']):
             self.hidden_blocks.append(
-                ResBlock(
-                    emb_channels, emb_channels, num_heads
-                )
+                ResBlock(args)
             )
 
         self.policy_head = Sequential('x, edge_index', [
-            (GATv2Conv(emb_channels, emb_channels, heads=1), 'x, edge_index -> x'),
-            BatchNorm(emb_channels),
+            (GATv2Conv(
+                args['emb_channels'],
+                args['emb_channels'],
+                heads=args['policy_mheads'],
+            ), 'x, edge_index -> x'),
+            BatchNorm(args['emb_channels']*args['policy_mheads']),
             nn.ReLU(),
-            Linear(emb_channels, 2),
+            Linear(args['emb_channels']*args['policy_mheads'], 2),
         ])
 
         self.value_head = Sequential('x, edge_index', [
-            (GATv2Conv(emb_channels, emb_channels, heads=1), 'x, edge_index -> x'),
-            BatchNorm(emb_channels),
+            (GATv2Conv(
+                args['emb_channels'],
+                args['emb_channels'],
+                heads=args['value_mheads']
+            ), 'x, edge_index -> x'),
+            BatchNorm(args['emb_channels']*args['value_mheads']),
             nn.ReLU(),
-            Linear(emb_channels, 1),
+            Linear(args['emb_channels']*args['value_mheads'], 1),
             nn.Tanh(),
         ])
 
@@ -90,7 +92,6 @@ class ResNet(nn.Module):
             A tuple containing the value estimation and policy logits.
         """
         x = self.encoder(node_attr)
-        x = self.in_block(x, edge_index)
         for block in self.hidden_blocks:
             x = block(x, edge_index)
 
@@ -105,12 +106,13 @@ class ResBlock(nn.Module):
 
     Parameters
     ----------
-    in_channels : int
-        Number of input channels.
-    emb_channels : int
-        Number of embedding channels.
-    num_heads : int
-        Number of attention heads.
+    args: dict
+        in_channels : int
+            Number of input channels.
+        emb_channels : int
+            Number of embedding channels.
+        num_heads : int
+            Number of attention heads.
 
     Attributes
     ----------
@@ -121,21 +123,29 @@ class ResBlock(nn.Module):
     batch_norm2 : BatchNorm
         Batch normalization layer.
     """
-    def __init__(self, in_channels, emb_channels, num_heads):
+    def __init__(self, args):
         super().__init__()
         self.in_layer = Sequential('x, edge_index', [
-            (GATv2Conv(in_channels, emb_channels, heads=num_heads), 'x, edge_index -> x'),
-            Linear(emb_channels*num_heads, emb_channels, bias=False)
+            (GATv2Conv(
+                args['emb_channels'],
+                args['emb_channels'],
+                heads=args['num_heads']
+            ), 'x, edge_index -> x'),
+            Linear(
+                args['emb_channels']*args['num_heads'],
+                args['emb_channels'],
+                bias=False
+            )
         ])
 
-        self.batch_norm1 = BatchNorm(emb_channels)
+        self.batch_norm1 = BatchNorm(args['emb_channels'])
 
         self.feed_forward = nn.Sequential(
-            Linear(emb_channels, 512),
+            Linear(args['emb_channels'], args['ff_dim']),
             nn.ReLU(),
-            Linear(512, emb_channels)
+            Linear(args['ff_dim'], args['emb_channels'])
         )
-        self.batch_norm2 = BatchNorm(emb_channels)
+        self.batch_norm2 = BatchNorm(args['emb_channels'])
 
     def forward(self, node_attr, edge_index):
         """

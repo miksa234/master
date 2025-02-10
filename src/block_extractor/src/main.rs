@@ -60,20 +60,20 @@ async fn main() -> Result<()> {
 //    ).await.unwrap();
 //
     let filtered_pools = load_pools_from_file(
-        Path::new("../data/pools_liq_degree_filter.csv"),
+        Path::new("../data/pools/pools_deg_15_liq_100_block_18.csv"),
     ).unwrap();
 
-    let filtered_tokens = load_tokens_from_file(
-        Path::new("../data/tokens_degree_filter.csv"),
+    let tokens = load_tokens_from_file(
+        Path::new("../data/tokens/tokens.csv"),
     ).unwrap();
 
     info!("#fltered_pools {:?}", filtered_pools.len());
-    info!("#filtered_tokens {:?}", filtered_tokens.len());
+    info!("#tokens {:?}", tokens.len());
 
     let p_to_block = provider.get_block_number().await?;
-    let p_from_block = 14763568;
-    //let p_from_block = p_to_block - 36000*1;
-    let block_gap = 9000; // approx 2 hours
+    let p_from_block = 18000000;
+    let block_gap = 9000; // approx 12 hours
+    //let block_gap = 36000; // approx 120 hours
 
     let prices = load_prices(
         provider.clone(),
@@ -81,7 +81,7 @@ async fn main() -> Result<()> {
         p_from_block,
         p_to_block,
         block_gap,
-        Path::new("../data/prices_3h.parquet")
+        Path::new("../data/prices/prices_deg_15_liq_100_block_18.parquet")
     ).await.unwrap();
 
     info!("Done len prices: {:?}", prices.len());
