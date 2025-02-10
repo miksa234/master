@@ -12,7 +12,6 @@ from .brute_force import *
 import networkx as nx
 import pandas as pd
 import numpy as np
-np.random.seed(seed=0)
 
 import torch
 from torch_geometric.data import Data
@@ -96,7 +95,7 @@ def run():
 
     # pool attributes
     edge_list = [list(e) for e in L.edges()]
-    rates = np.array([e[-1]['mexr'] for e in L.nodes(data=True)]).T
+    rates = np.array([np.log(e[-1]['mexr']) for e in L.nodes(data=True)]).T
     fees = [e[-1]['fee'] for e in L.nodes(data=True)]
     used = [0 for _ in range(len(L.nodes))]
     t0_using = [0 for _ in range(len(L.nodes))]
@@ -120,11 +119,11 @@ def run():
         'C_2/3' : 2.0,
         'C_3/3' : 1.5,
         'num_iterations': 100,
-        'num_searches': len(game.edges),
-        'num_self_play_iterations': len(game.edges)*2,
-        'num_parallel': len(game.edges)*2//5,
+        'num_searches': 20,
+        'num_self_play_iterations': 25,
+        'num_parallel': 5,
         'num_epochs': 10,
-        'batch_size': 128,
+        'batch_size': 32,
         'temperature': 1.25,
         'eps': 0.25,
         'dirichlet_alpha': 0.3,

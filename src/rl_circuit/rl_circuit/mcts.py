@@ -400,8 +400,8 @@ class MCTSParallel:
                 self.game.encode_state(s),
                 self.game.data.edge_index
             )[1]
-        policy = torch.stack(policy)
 
+        policy = torch.stack(policy)
         policy = torch.softmax(policy, dim=1).detach().cpu().numpy()
 
         # dirichlet random noise

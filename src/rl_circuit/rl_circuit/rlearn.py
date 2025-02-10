@@ -66,7 +66,13 @@ class AgentRLearn:
         self.game.current_block = at_block
         p_memory = [PMemory(self.game, at_block) for _ in range(self.args['num_parallel'])]
 
+        total = len(p_memory)
+        pbar = tqdm(total=total, desc='terminal states')
         while len(p_memory) > 0:
+            if len(p_memory) < total:
+                pbar.update(1)
+                total = len(p_memory)
+
             states = [mem.state for mem in p_memory]
             self.mcts.search(states, p_memory)
 
@@ -134,13 +140,22 @@ class AgentRLearn:
             policy_targets, value_targets = np.array(policy_targets), np.array(value_targets)
             policy_targets, value_targets = torch.tensor(policy_targets).to(DEVICE).float(), torch.tensor(value_targets).to(DEVICE).float()
 
+
+            logger.info(f"len states = {len(states)}")
             value_outs, policy_outs = [], []
             for i, s in enumerate(states):
                 self.game.current_block = block_indices[i]
+
+                free, total = torch.cuda.mem_get_info(DEVICE)
+                mem_used_MB = (total - free) / 1024 ** 2
+                logger.info(f"mem_used: {mem_used_MB} iteration {i}, len state = {len(s)}")
+
+                e_x = self.game.encode_state(s)
                 v, p = self.model(
-                    self.game.encode_state(s),
+                    e_x,
                     self.game.data.edge_index
                 )
+                del e_x
                 value_outs += v
                 policy_outs += p
 
@@ -188,7 +203,7 @@ class AgentRLearn:
             self.model.eval()
             if not self.args['multicore']:
                 # single core self-play
-                for play_iter in tqdm(range(self.args['num_self_play_iterations']//self.args['num_parallel']), desc="self_play"):
+                for play_iter in tqdm(range(self.args['num_self_play_iterations']//self.args['num_parallel']), desc="self play"):
                     memory += self.self_play()
             else:
                 # multicore self-play
