@@ -1,8 +1,8 @@
 # C extensions
 *.so
-src/data/cached_pools.csv
-src/data/cached-honeypot.csv
-src/data/cached-tokens.csv
+
+
+# Model & Data
 data
 model
 
