@@ -37,9 +37,21 @@ def run():
         '../data/prices/prices_deg_15_liq_100_block_18.parquet'
     )
     pools, prices = filter_pools_with_no_gradient(pools, prices)
+    print(len(pools))
 
     num_blocks = len(set(prices['block_number']))
     G = make_token_graph(pools, prices)
+
+    # plots prices
+#    import matplotlib.pyplot as plt
+#    for e in G.edges(data=True):
+#        plt.plot(e[2]['weight'])
+#        pool_adr = pools[(pools['token0']== e[0]) & (pools['token1'] == e[1])].iloc[e[2]['k']]['address']
+#        plt.savefig(f'./plots/{pool_adr}.png')
+#        plt.close()
+#
+#    exit()
+
     G, token_mapping = linear_node_relabel(G)
 
     L = nx.line_graph(G, create_using=nx.Graph)
@@ -55,7 +67,6 @@ def run():
     for (t0, t1, d) in edges:
         inverse_weights = [1/el for el in d['weight']]
         G.add_edge(t1, t0, k=d['k'], weight=inverse_weights, address=d['address'])
-
 
 
 #    weights = np.random.uniform(0.01, 100, size=(6, 6))

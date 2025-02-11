@@ -7,21 +7,21 @@ import numpy as np
 
 def load_pools_and_tokens(path_pools, path_tokens):
     """
-    Load pool and token data from CSV files into pandas DataFrames.
+    Load pool & token data into pd.DataFrame/s from csv files.
 
     Parameters
     ----------
     path_pools : str
-        The path to the CSV file containing pool data.
+        File path to csv file for the pools
     path_tokens : str
-        The path to the CSV file containing token data.
+        File path to csv file for the tokens
 
     Returns
     -------
     tuple
-        A tuple containing two pandas DataFrames:
-        - pools (pd.DataFrame): DataFrame containing the pool data.
-        - tokens (pd.DataFrame): DataFrame containing the token data.
+        A tuple containing:
+        - pools (pd.DataFrame): pool data.
+        - tokens (pd.DataFrame): token data.
     """
     pools = pd.read_csv(
         path_pools,
@@ -40,20 +40,17 @@ def load_pools_and_tokens(path_pools, path_tokens):
 
 def make_price(price):
     """
-    Calculate the price from the given price data.
+    Calculate the price from price pd.DataFrame
     Uniswapv3 price is t1/t0 -> sqrt_price_x96 = sqrt(reserve1/reserve0) * 2**96
     Uniswapv2 price we will define also as t1/t0
 
     Parameters
     ----------
     price : pd.DataFrame
-        DataFrame containing price data with columns
-        'sqrt_price_x96', 'reserve_t0', and 'reserve_t1'.
 
     Returns
     -------
-    list
-        A list of calculated prices.
+    list: prices.
     """
     block_price = []
     for _, p in price.iterrows():
@@ -68,25 +65,22 @@ def make_price(price):
 
 def pools_to_edge_list(pools, prices):
     """
-    Convert pool and price data into an edge list.
+    Makes an edge list from pools & prices for the problem graph.
 
     Parameters
     ----------
     pools : pd.DataFrame
-        DataFrame containing pool data with
-        columns 'token0', 'token1', and 'address'.
+        pool data
     prices : pd.DataFrame
-        DataFrame containing price data with
-        columns 'pool_address' and other price-related columns.
+        price data
 
     Returns
     -------
     list
-        A list of edges where each edge is represented
-        as a tuple (token0, token1, attributes).
-        The attributes dictionary contains:
-        - 'k' (int): The count of occurrences of the token pair in the cache.
-        - 'weight' (float): The price associated with the pool.
+        List of edges in the form of a tuple (token0, token1, attributes).
+        Where the attributes is a type dict with keys:
+        - 'k' (int): Repeated count of the pool with the same tokens.
+        - 'weight' (list): The historical prices of the specific pool.
     """
     edge_list = []
     cache = []
@@ -103,7 +97,7 @@ def pools_to_edge_list(pools, prices):
                 k += 1
         edge_list.append(
             (t0, t1,
-             {'k': k, 'weight': p, 'address': pool['address'], 'fee': int(pool['fee'])/10e6})
+             {'k': k, 'weight': p, 'address': pool['address'], 'fee': int(pool['fee'])/1e6})
         )
         cache.append((t0, t1))
 
@@ -112,20 +106,21 @@ def pools_to_edge_list(pools, prices):
 
 def make_token_graph(pools, prices):
     """
-    Create a token graph from pool and price data.
+    Make a directed multi graph from pool and price data.
 
     Parameters
     ----------
     pools : pd.DataFrame
-        DataFrame containing pool data.
-    latest_prices : pd.DataFrame
-        DataFrame containing the latest price data.
+        Pool data.
+    prices : pd.DataFrame
+        Price data.
 
     Returns
     -------
-    networkx.MultiDiGraph
-        A directed multigraph where nodes represent
-        tokens and edges represent pools with attributes.
+    nx.MultiDiGraph
+        A directed multi graph. Nodes represent tokens
+        edges represent pools with attributes generated
+        by the function pools_to_edge_list
     """
     edge_list = pools_to_edge_list(pools, prices)
 
@@ -135,20 +130,21 @@ def make_token_graph(pools, prices):
 
 def linear_node_relabel(G):
     """
-    Relabel the nodes of the graph with consecutive integers.
+    Relabel the nodes linearly. Input node labels
+    are ETH addresses which are relabeled in a chronological order
+    to integer values starting from 0.
 
     Parameters
     ----------
-    G : networkx.MultiDiGraph
-        The input graph with nodes to be relabeled.
+    G : nx.MultiDiGraph
+        Input graph.
 
     Returns
     -------
     tuple
         A tuple containing:
-        - G (networkx.MultiDiGraph): The graph with relabeled nodes.
-        - mapping (dict): A dictionary mapping the original
-          node labels to the new labels.
+        - G (nx.MultiDiGraph): Graph with relabeled nodes (automatically edges).
+        - mapping (dict): Mapping dictionary.
     """
     mapping = {}
     for i, node in enumerate(list(G.nodes())):
@@ -159,35 +155,32 @@ def linear_node_relabel(G):
 
 def filter_pools_with_no_gradient(pools, prices):
     """
-    Filter out pools that have no gradient in their price data.
-
-    This function filters the given pool and price data to remove pools
-    where the price gradient is zero, indicating no change in price.
+    Filter out pools that have no change in price by computing the gradient of
+    the historical prices.
 
     Parameters
     ----------
     pools : pd.DataFrame
-        DataFrame containing pool data
+        Pool data.
     prices : pd.DataFrame
-        DataFrame containing price data
+        Price data
 
     Returns
     -------
     tuple
-        A tuple containing two pandas DataFrames:
-        - filtered_pools (pd.DataFrame): DataFrame containing the filtered pool data.
-        - filtered_prices (pd.DataFrame): DataFrame containing the filtered price data.
+        A tuple containing:
+        - filtered_pools (pd.DataFrame): Filtered pool data.
+        - filtered_prices (pd.DataFrame): Filtered price data.
     """
     pools = pools[pools['address'].isin(set(prices['pool_address']))]
+    ticks = len(prices['block_number'].unique())
     mask = []
     for _, pool in pools.iterrows():
         t0 = pool['token0']
         t1 = pool['token1']
         p = make_price(prices[prices['pool_address'] == pool['address']])
-        mask.append(np.gradient(p).sum() != 0)
+        mask.append(np.count_nonzero(np.gradient(p)) > ticks*2//3 )
 
     pools = pools[mask]
     prices = prices[prices['pool_address'].isin(list(pools['address']))]
     return pools, prices
-
-

@@ -141,21 +141,13 @@ class AgentRLearn:
             policy_targets, value_targets = torch.tensor(policy_targets).to(DEVICE).float(), torch.tensor(value_targets).to(DEVICE).float()
 
 
-            logger.info(f"len states = {len(states)}")
             value_outs, policy_outs = [], []
             for i, s in enumerate(states):
                 self.game.current_block = block_indices[i]
-
-                free, total = torch.cuda.mem_get_info(DEVICE)
-                mem_used_MB = (total - free) / 1024 ** 2
-                logger.info(f"mem_used: {mem_used_MB} iteration {i}, len state = {len(s)}")
-
-                e_x = self.game.encode_state(s)
                 v, p = self.model(
-                    e_x,
+                    self.game.encode_state(s),
                     self.game.data.edge_index
                 )
-                del e_x
                 value_outs += v
                 policy_outs += p
 
