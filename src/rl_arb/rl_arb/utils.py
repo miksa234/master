@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import pandas as pd
 import networkx as nx
 import numpy as np
@@ -6,7 +7,8 @@ import torch
 import os
 import pickle
 import requests
-from .config import TELEGRAM_CHAT_ID, TELEGRAM_SEND_URL
+
+from rl_arb.config import TELEGRAM_CHAT_ID, TELEGRAM_SEND_URL
 
 def load_pools_and_tokens(path_pools, path_tokens):
     """
@@ -194,8 +196,6 @@ def save_loss_and_states_and_update_me(
     value_loss,
     states,
     iteration,
-    epoch_iter,
-    batch_idx,
     telegram
 ):
     """
@@ -213,10 +213,6 @@ def save_loss_and_states_and_update_me(
         List of states.
     iteration: int
         Current iteration number.
-    epoch_iter: int
-        Current epoch number.
-    batch_idx: int
-        Current batch index in the epoch.
     telegram: bool
         Send message via telegram or not.
     """
@@ -230,13 +226,13 @@ def save_loss_and_states_and_update_me(
 
     torch.save(
         policy_loss,
-        f'./model/loss/policy_loss_{iteration}_{epoch_iter}_{batch_idx}.pt'
+        f'./model/loss/policy_loss_{iteration}.pt'
     )
     torch.save(
         policy_loss,
-        f'./model/loss/value_loss_{iteration}_{epoch_iter}_{batch_idx}.pt'
+        f'./model/loss/value_loss_{iteration}.pt'
     )
-    with open(f'./model/states/state_{iteration}_{epoch_iter}_{batch_idx}.pickle', "wb") as f:
+    with open(f'./model/states/state_{iteration}.pickle', "wb") as f:
         pickle.dump(states, f)
 
     avg_state_len = np.mean(np.array([len(s) for s in states]))

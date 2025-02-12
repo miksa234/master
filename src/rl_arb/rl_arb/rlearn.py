@@ -1,26 +1,21 @@
 #!/usr/bin/env python3
 
-from .mcts import MCTS, MCTSParallel, PMemory
-from .game import NetGame
-from .config import DEVICE
-from .utils import save_loss_and_states_and_update_me, send_telegram_message
-
-
 import numpy as np
 import torch
-import torch.multiprocessing as mp
 from torch.nn import functional as F
-
-from tqdm import tqdm
-
-import time
-
+import torch.multiprocessing as mp
+from tqdm.contrib.telegram import tqdm
 import logging
 logger = logging.getLogger('rl_circuit')
 
+from rl_arb.mcts import *
+from rl_arb.mdp import *
+from rl_arb.config import *
+from rl_arb.utils import *
+
 
 class AgentRLearn:
-    def __init__(self, model, optimizer, game: NetGame, args):
+    def __init__(self, model, optimizer, mdp: MDP, args):
         """
         RL algorithm class for training and self-play using Monte Carlo Tree
         Search (MCTS).
@@ -31,8 +26,8 @@ class AgentRLearn:
             The neural network model used for policy and value prediction.
         optimizer : torch.optim.Optimizer
             The optimizer used for training the model.
-        game : NetGame
-            The game environment that provides the game logic and state transitions.
+        mdp : MDP
+            The MDP environment that provides the logic and state transitions.
         args : dict
             A dictionary of arguments and hyperparameters for training and self-play.
 
@@ -41,15 +36,15 @@ class AgentRLearn:
         self_play()
             Executes self-play to generate training data.
         train(memory)
-            Trains the model using the provided memory of game states and outcomes.
+            Trains the model using the provided memory of mdp states and outcomes.
         learn()
             Main loop for the learning process, including self-play and training.
         """
         self.model = model
         self.optimizer = optimizer
-        self.game = game
+        self.mdp = mdp
         self.args = args
-        self.mcts = MCTSParallel(self.game, self.args, self.model)
+        self.mcts = MCTSParallel(self.mdp, self.args, self.model)
 
 
     def self_play(self):
@@ -59,16 +54,20 @@ class AgentRLearn:
         Returns
         -------
         list
-            A list of tuples containing game states, policy probabilities,
+            A list of tuples containing mdp states, policy probabilities,
             value estimates, and block indices.
         """
         return_mem = []
-        at_block = np.random.choice(self.game.num_blocks)
-        self.game.current_block = at_block
-        p_memory = [PMemory(self.game, at_block) for _ in range(self.args['num_parallel'])]
+        at_block = np.random.choice(self.mdp.num_blocks)
+        self.mdp.current_block = at_block
+        p_memory = [PMemory(self.mdp, at_block) for _ in range(self.args['num_parallel'])]
 
         total = len(p_memory)
-        pbar = tqdm(total=total, desc='terminal states')
+        pbar = tqdm(
+            total=total, desc='terminal states',
+            token=TELEGRAM_TOKEN, chat_id=TELEGRAM_CHAT_ID,
+            disable=self.args['telegram']
+        )
         while len(p_memory) > 0:
             if len(p_memory) < total:
                 pbar.update(1)
@@ -80,10 +79,10 @@ class AgentRLearn:
             for i in range(len(p_memory))[::-1]:
                 mem = p_memory[i]
 
-                probs = np.zeros(len(self.game.edge_list))
+                probs = np.zeros(len(self.mdp.edge_list))
                 for child in mem.root.children:
                     probs[
-                        self.game.edge_list.index(child.action_taken)
+                        self.mdp.edge_list.index(child.action_taken)
                     ] = child.visit_count
                 probs /= np.sum(probs)
 
@@ -96,13 +95,13 @@ class AgentRLearn:
                 temp_probs /= temp_probs.sum()
 
                 action_idx = np.random.choice(
-                    list(range(len(self.game.edge_list))),
+                    list(range(len(self.mdp.edge_list))),
                     p=probs
                 )
-                action = self.game.edge_list[action_idx]
+                action = self.mdp.edge_list[action_idx]
 
-                mem.state = self.game.get_next_state(mem.state, action)
-                value, is_terminal = self.game.get_value_and_terminated(mem.state)
+                mem.state = self.mdp.get_next_state(mem.state, action)
+                value, is_terminal = self.mdp.get_value_and_terminated(mem.state)
 
                 if is_terminal:
                     for hist_state, hist_probs in mem.memory:
@@ -118,12 +117,12 @@ class AgentRLearn:
 
     def train(self, memory, iteration, epoch_iter):
         """
-        Trains the model using the provided memory of game states and outcomes.
+        Trains the model using the provided memory of mdp states and outcomes.
 
         Parameters
         ----------
         memory : list
-            A list of tuples containing game states, policy probabilities,
+            A list of tuples containing mdp states, policy probabilities,
             value estimates, and block indices.
         """
         np.random.shuffle(memory)
@@ -144,10 +143,10 @@ class AgentRLearn:
 
             value_outs, policy_outs = [], []
             for i, s in enumerate(states):
-                self.game.current_block = block_indices[i]
+                self.mdp.current_block = block_indices[i]
                 v, p = self.model(
-                    self.game.encode_state(s),
-                    self.game.data.edge_index
+                    self.mdp.encode_state(s),
+                    self.mdp.data.edge_index
                 )
                 value_outs += v
                 policy_outs += p
@@ -159,14 +158,16 @@ class AgentRLearn:
             value_loss = F.mse_loss(value_outs, value_targets)
             loss = policy_loss + value_loss
 
-            save_loss_and_states_and_update_me(
-                policy_loss, value_loss, states,
-                iteration, epoch_iter, batch_idx, self.args['telegram']
-            )
 
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+
+        if epoch_iter == self.args['num_epochs']-1:
+            save_loss_and_states_and_update_me(
+                policy_loss, value_loss, states,
+                iteration, self.args['telegram']
+            )
 
     def adapt_exploration_parameter(self, iteration):
         """
@@ -202,7 +203,13 @@ class AgentRLearn:
             self.model.eval()
             if not self.args['multicore']:
                 # single core self-play
-                for play_iter in tqdm(range(self.args['num_self_play_iterations']//self.args['num_parallel']), desc="self play"):
+                for play_iter in tqdm(
+                    range(self.args['num_self_play_iterations']//self.args['num_parallel']),
+                    desc="self play",
+                    token=TELEGRAM_TOKEN,
+                    chat_id=TELEGRAM_CHAT_ID,
+                    disable=self.args['telegram']
+                ):
                     memory += self.self_play()
 
             else:
@@ -223,7 +230,13 @@ class AgentRLearn:
                     memory += result
 
             self.model.train()
-            for epoch_iter in tqdm(range(self.args['num_epochs']), desc="epochs"):
+            for epoch_iter in tqdm(
+                range(self.args['num_epochs']),
+                desc="epochs",
+                token=TELEGRAM_TOKEN,
+                chat_id=TELEGRAM_CHAT_ID,
+                disable=self.args['telegram']
+            ):
                 self.train(memory, iteration, epoch_iter)
 
             torch.save(self.model.state_dict(), f"./model/model_{iteration}.pt")
@@ -245,7 +258,7 @@ def self_play_num_times(rlearn, times=100):
     Returns
     -------
     list
-        A list of tuples containing game states, policy probabilities, value estimates, and block indices.
+        A list of tuples containing mdp states, policy probabilities, value estimates, and block indices.
     """
     memory = []
     for _ in range(times):

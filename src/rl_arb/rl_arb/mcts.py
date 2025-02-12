@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from .config import DEVICE
 import numpy as np
 import torch
 
@@ -16,7 +15,7 @@ class Node:
     args : dict
         Arguments for the MCTS.
     state : object
-        The state of the game at this node.
+        The state of the mdp at this node.
     parent : Node, optional
         The parent node of this node.
     action_taken : object, optional
@@ -42,18 +41,18 @@ class Node:
         Calculates the UCB value for a child node.
     get_ucb_alphazero(child):
         Calculates the UCB value for a child node using the AlphaZero method.
-    expand(game):
+    expand(mdp):
         Expands the node by adding a child node.
-    expand_alphazero(policy, game):
+    expand_alphazero(policy, mdp):
         Expands the node using the AlphaZero policy.
-    simulate(game):
+    simulate(mdp):
         Simulates a rollout from the current state.
     backpropagete(value):
         Backpropagates the value through the tree.
     """
     def __init__(
             self,
-            game,
+            mdp,
             args,
             state,
             parent=None,
@@ -67,7 +66,7 @@ class Node:
         self.action_taken = action_taken
 
         self.children = []
-        self.expandable_actions = game.get_valid_actions(state)
+        self.expandable_actions = mdp.get_valid_actions(state)
 
         self.visit_count = visit_count
         self.value_sum = 0
@@ -156,14 +155,14 @@ class Node:
 
         return q_value + self.args['C'] * np.sqrt(self.visit_count)/(child.visit_count + 1) * child.prior
 
-    def expand(self, game):
+    def expand(self, mdp):
         """
         Expands the node by adding a child node.
 
         Parameters
         ----------
-        game : object
-            The game object.
+        mdp : object
+            The mdp object.
 
         Returns
         -------
@@ -176,13 +175,13 @@ class Node:
         self.expandable_actions.pop(action_index)
 
         child_state = self.state.copy()
-        child_state = game.get_next_state(child_state, action)
+        child_state = mdp.get_next_state(child_state, action)
 
-        child = Node(game, self.args, child_state, self, action)
+        child = Node(mdp, self.args, child_state, self, action)
         self.children.append(child)
         return child
 
-    def expand_alphazero(self, policy, game):
+    def expand_alphazero(self, policy, mdp):
         """
         Expands the node using the AlphaZero policy.
 
@@ -190,43 +189,43 @@ class Node:
         ----------
         policy : array-like
             The policy probabilities for each action.
-        game : object
-            The game object.
+        mdp : object
+            The mdp object.
         """
         for action, prob in enumerate(policy):
             if prob > 0:
                 child_state = self.state.copy()
-                child_state = game.get_next_state(child_state, game.edge_list[action])
+                child_state = mdp.get_next_state(child_state, mdp.edge_list[action])
 
-                child = Node(game, self.args, child_state, self, game.edge_list[action], prob)
+                child = Node(mdp, self.args, child_state, self, mdp.edge_list[action], prob)
                 self.children.append(child)
 
-    def simulate(self, game):
+    def simulate(self, mdp):
         """
         Simulates a rollout from the current state.
 
         Parameters
         ----------
-        game : object
-            The game object.
+        mdp : object
+            The mdp object.
 
         Returns
         -------
         float
             The value of the terminal state reached by the rollout.
         """
-        value, is_terminal = game.get_value_and_terminated(self.state)
+        value, is_terminal = mdp.get_value_and_terminated(self.state)
         if is_terminal:
             return value
 
         rollout_state = self.state.copy()
         while True:
-            valid_actions = game.get_valid_actions(rollout_state)
+            valid_actions = mdp.get_valid_actions(rollout_state)
             action_index = np.random.choice(range(len(valid_actions)))
             action = valid_actions[action_index]
 
-            rollout_state = game.get_next_state(rollout_state, action)
-            value, is_terminal = game.get_value_and_terminated(rollout_state)
+            rollout_state = mdp.get_next_state(rollout_state, action)
+            value, is_terminal = mdp.get_value_and_terminated(rollout_state)
             if is_terminal:
                 return value
 
@@ -252,8 +251,8 @@ class MCTS:
 
     Attributes
     ----------
-    game : object
-        The game object.
+    mdp : object
+        The mdp object.
     args : dict
         Arguments for the MCTS.
     model : object
@@ -264,8 +263,8 @@ class MCTS:
     search(state):
         Performs the MCTS search from the given state.
     """
-    def __init__(self, game, args, model):
-        self.game = game
+    def __init__(self, mdp, args, model):
+        self.mdp = mdp
         self.args = args
         self.model = model
 
@@ -278,27 +277,27 @@ class MCTS:
         Parameters
         ----------
         state : object
-            The state of the game.
+            The state of the mdp.
 
         Returns
         -------
         array-like
             The visit count distribution over actions.
         """
-        root = Node(self.game, self.args, state, visit_count=1)
+        root = Node(self.mdp, self.args, state, visit_count=1)
 
         _, policy = self.model(
-            self.game.encode_state(root.state),
-            self.game.data.edge_index,
+            self.mdp.encode_state(root.state),
+            self.mdp.data.edge_index,
         )
         policy = torch.softmax(policy.squeeze(0), dim=0).detach().cpu().numpy()
 
         # dirichlet random noise
         policy = (1-self.args['eps']) * policy \
             + self.args['eps'] * np.random.dirichlet([self.args['dirichlet_alpha']]) * np.ones(policy.shape)
-        policy = self.game.mask_policy(policy, root.state)
+        policy = self.mdp.mask_policy(policy, root.state)
 
-        root.expand_alphazero(policy, self.game)
+        root.expand_alphazero(policy, self.mdp)
 
         for s in range(self.args['num_searches']):
             node = root
@@ -307,20 +306,20 @@ class MCTS:
                 node = node.select()
 
 
-            value, is_terminal = self.game.get_value_and_terminated(node.state)
+            value, is_terminal = self.mdp.get_value_and_terminated(node.state)
 
             if not is_terminal:
                 value, policy = self.model(
-                    self.game.encode_state(root.state),
-                    self.game.data.edge_index
+                    self.mdp.encode_state(root.state),
+                    self.mdp.data.edge_index
                 )
                 policy = torch.softmax(policy.squeeze(0), dim=0)
-                policy = self.game.mask_policy(policy, node.state)
+                policy = self.mdp.mask_policy(policy, node.state)
 
                 value = value.item()
 
                 # expansion
-                node.expand_alphazero(policy, self.game)
+                node.expand_alphazero(policy, self.mdp)
 
                 # simulation not needed for AlphaZero
                 # node = node.expand()
@@ -332,11 +331,11 @@ class MCTS:
             node.backpropagete(value)
 
         # return visit_count distribution
-        valid_actions = self.game.get_valid_actions(state)
-        action_probs = np.zeros(len(self.game.edge_list))
+        valid_actions = self.mdp.get_valid_actions(state)
+        action_probs = np.zeros(len(self.mdp.edge_list))
         for child in root.children:
             action_probs[
-                self.game.edge_list.index(child.action_taken)
+                self.mdp.edge_list.index(child.action_taken)
             ] = child.visit_count
 
         action_probs /= np.sum(action_probs)
@@ -350,11 +349,11 @@ class MCTSParallel:
 
     Attributes
     ----------
-    game : object
-        The game object.
+    mdp : MDP
+        The mdp object.
     args : dict
         Arguments for the MCTS.
-    model : object
+    model : nn.Module
         The model used for policy and value predictions.
 
     Methods
@@ -364,8 +363,8 @@ class MCTSParallel:
     search(states, p_memory):
         Performs the parallel MCTS search from the given states.
     """
-    def __init__(self, game, args, model):
-        self.game = game
+    def __init__(self, mdp, args, model):
+        self.mdp = mdp
         self.args = args
         self.model = model
 
@@ -389,16 +388,16 @@ class MCTSParallel:
 
         Parameters
         ----------
-        states : list
+        states : list[tuple]
             The list of states to search from.
-        p_memory : list
+        p_memory : list[Pmemory]
             The list of PMemory objects for parallel search.
         """
         policy = []
         for i, s in enumerate(states):
             policy += self.model(
-                self.game.encode_state(s),
-                self.game.data.edge_index
+                self.mdp.encode_state(s),
+                self.mdp.data.edge_index
             )[1]
 
         policy = torch.stack(policy)
@@ -410,10 +409,10 @@ class MCTSParallel:
 
         for i, mem in enumerate(p_memory):
             p_policy = torch.tensor(policy[i])
-            p_policy = self.game.mask_policy(p_policy, states[i])
+            p_policy = self.mdp.mask_policy(p_policy, states[i])
 
-            mem.root = Node(self.game, self.args, states[i], visit_count=1)
-            mem.root.expand_alphazero(p_policy, self.game)
+            mem.root = Node(self.mdp, self.args, states[i], visit_count=1)
+            mem.root.expand_alphazero(p_policy, self.mdp)
 
         for _ in range(self.args['num_searches']):
             for mem in p_memory:
@@ -422,7 +421,7 @@ class MCTSParallel:
                 while node.is_fully_expanded():
                     node = node.select()
 
-                value, is_terminal = self.game.get_value_and_terminated(node.state)
+                value, is_terminal = self.mdp.get_value_and_terminated(node.state)
 
                 if is_terminal:
                     node.backpropagete(value)
@@ -435,8 +434,8 @@ class MCTSParallel:
                 value, policy = [], []
                 for i in expandable:
                     v, p = self.model(
-                        self.game.encode_state(p_memory[i].node.state),
-                        self.game.data.edge_index
+                        self.mdp.encode_state(p_memory[i].node.state),
+                        self.mdp.data.edge_index
                     )
                     value += v
                     policy += p
@@ -449,9 +448,9 @@ class MCTSParallel:
                 node = p_memory[idx].node
                 p_value, p_policy = value[i], policy[i]
 
-                p_policy = self.game.mask_policy(p_policy, node.state)
+                p_policy = self.mdp.mask_policy(p_policy, node.state)
 
-                node.expand_alphazero(p_policy, self.game)
+                node.expand_alphazero(p_policy, self.mdp)
                 node.backpropagete(p_value)
 
 
@@ -462,10 +461,10 @@ class PMemory:
 
     Attributes
     ----------
-    state : list
-        The state of the game.
+    state : list[tuple]
+        The state of the mdp.
     current_block : int
-        The current block in the game.
+        The current block in the mdp.
     memory : list
         The memory of the search.
     root : Node
@@ -473,8 +472,8 @@ class PMemory:
     node : Node
         The current node in the search tree.
     """
-    def __init__(self, game, at_block):
-        node = int(np.random.choice(game.nodes))
+    def __init__(self, mdp, at_block):
+        node = int(np.random.choice(mdp.nodes))
         self.state = [(node, node, 0)]
         self.current_block = at_block
         self.memory = []

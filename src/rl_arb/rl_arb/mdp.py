@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 
-from .config import DEVICE
-from torch_geometric.data import Data
 import networkx as nx
 import torch
 import numpy as np
+from torch_geometric.data import Data
 
-class NetGame:
+from rl_arb.config import DEVICE
+
+class MDP:
     """
-    A class to represent a network game.
+    A class to represent the Markov Decision Process environment.
 
     Attributes:
     -----------
@@ -52,7 +53,6 @@ class NetGame:
             G: nx.MultiDiGraph,
             data,
             line_mapping,
-            num_blocks,
             args,
             current_block=-1
     ):
@@ -80,8 +80,8 @@ class NetGame:
 
         self.data = data
         self.line_mapping = line_mapping
-        self.num_blocks = num_blocks
-        self.current_block = self.num_blocks-1
+        self.num_blocks = len(list(self.edges.items())[0][1])
+        self.current_block = self.num_blocks
 
     def set_current_block(self, block_index):
         """

@@ -42,5 +42,5 @@ ARGS_TRAINING = {
     'dirichlet_alpha': 0.3,
     'num_processes': 5,
     'multicore': True,
-    'telegram': True,
+    'telegram': False,
 }

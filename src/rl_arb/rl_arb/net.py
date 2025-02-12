@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-from .config import DEVICE
-
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -10,9 +8,11 @@ from torch_geometric.nn import BatchNorm, GATv2Conv, Sequential, Linear
 import logging
 logger = logging.getLogger('rl_circuit')
 
-class ResNet(nn.Module):
+from rl_arb.config import DEVICE
+
+class Net(nn.Module):
     """
-    A Residual Network (ResNet) model for graph-based data.
+    A Residual Network model for graph-based data.
 
     Parameters
     ----------
@@ -52,7 +52,7 @@ class ResNet(nn.Module):
         self.hidden_blocks = nn.ModuleList()
         for _ in range(args['num_layers']):
             self.hidden_blocks.append(
-                ResBlock(args)
+                ResCovBlock(args)
             )
 
         self.policy_head = Sequential('x, edge_index', [
@@ -104,7 +104,7 @@ class ResNet(nn.Module):
 
         return value, policy
 
-class ResBlock(nn.Module):
+class ResCovBlock(nn.Module):
     """
     A Residual Block used in the ResNet model.
 

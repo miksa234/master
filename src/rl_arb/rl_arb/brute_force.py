@@ -4,7 +4,6 @@ import numpy as np
 import networkx as nx
 
 
-
 def brute_force_search_trail(graph, source):
     def dfs(path):
         current_node = path[-1]
