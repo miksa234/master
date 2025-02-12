@@ -206,10 +206,10 @@ class NetGame:
         # get the right prices for the block
         e_x= torch.dstack([
             e_x[:, self.current_block],       # exchange rate
-            e_x[:, self.num_blocks-1+1],      # swap fee
-            e_x[:, self.num_blocks-1+2],      # used binary
-            e_x[:, self.num_blocks-1+3],      # t0 binary
-            e_x[:, self.num_blocks-1+4],      # t1 binary
+#            e_x[:, self.num_blocks-1+1],      # swap fee
+            e_x[:, self.num_blocks-1+1],      # used binary
+            e_x[:, self.num_blocks-1+2],      # t0 binary
+            e_x[:, self.num_blocks-1+3],      # t1 binary
         ]).squeeze(0)
 
         # encode the current t0 or t1
@@ -223,7 +223,7 @@ class NetGame:
                 line_state = (state[-1][1], state[-1][0], state[-1][2])
 
             e_x[self.line_mapping[line_state],
-                line_state[:2].index(current_node)+3] = 1
+                line_state[:2].index(current_node)+2] = 1
 
             # encode the used edges
             edge_idx = []
@@ -232,7 +232,7 @@ class NetGame:
                     edge_idx.append(self.line_mapping[e])
                 if (e[1], e[0], e[2]) in line_mapping_keys:
                     edge_idx.append(self.line_mapping[(e[1], e[0], e[2])])
-            e_x[edge_idx, 2] = 1
+            e_x[edge_idx, 1] = 1
 
         return e_x.to(DEVICE)
 

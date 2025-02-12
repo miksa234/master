@@ -9,7 +9,6 @@ def brute_force_search_trail(graph, source):
     def dfs(path):
         current_node = path[-1]
         if len(path) > 1 and path[-1] == path[0]:
-            print(path)
             trails.append(path)
             return
         if len(path) == 1:

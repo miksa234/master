@@ -37,7 +37,6 @@ def run():
         '../data/prices/prices_deg_15_liq_100_block_18.parquet'
     )
     pools, prices = filter_pools_with_no_gradient(pools, prices)
-    print(len(pools))
 
     num_blocks = len(set(prices['block_number']))
     G = make_token_graph(pools, prices)
@@ -107,12 +106,13 @@ def run():
     # pool attributes
     edge_list = [list(e) for e in L.edges()]
     rates = np.array([np.log(e[-1]['mexr']) for e in L.nodes(data=True)]).T
-    fees = [e[-1]['fee'] for e in L.nodes(data=True)]
+    #fees = [e[-1]['fee'] for e in L.nodes(data=True)]
     used = [0 for _ in range(len(L.nodes))]
     t0_using = [0 for _ in range(len(L.nodes))]
     t1_using = [0 for _ in range(len(L.nodes))]
 
-    node_attr  = torch.tensor(np.dstack([*rates, fees, used, t0_using, t1_using])).float().squeeze(0)
+    #node_attr  = torch.tensor(np.dstack([*rates, fees, used, t0_using, t1_using])).float().squeeze(0)
+    node_attr  = torch.tensor(np.dstack([*rates, used, t0_using, t1_using])).float().squeeze(0)
     edge_index = torch.tensor(edge_list).t().contiguous()
 
     data = Data(x=node_attr, edge_index=edge_index).to(DEVICE)

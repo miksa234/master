@@ -3,9 +3,44 @@
 \begin{document}
 
 \maketitle
+\thispagestyle{empty}
+\vspace*{\fill}
+The thesis deals with the analysis and the development of a solution to the
+arbitrage problem in decentralized finance. In this context, arbitrage is a
+subform of strategies used to extract Maximal Extractable Value (MEV) on
+public blockchains, specifically with smart contract functionality.
 
-This needs to be a half page expose.
+MEV sometimes also called Miner Extractable Value or Block Proposer
+Extractable Value refers to the maximal value that can be extracted from
+block production, without considering block rewards or gas fees. This is done
+by including or excluding transactions in the public transaction pool and
+combining them with custom transactions specifically aimed to exploit the
+market inefficiency. Due to the short time window for block production, e.g.
+on the Ethereum chain blocks are included every 12 seconds, extremely
+efficient methods are needed for extracting MEV. While some forms of MEV,
+essentially exploit the transaction of an end user and give them an overall
+worse-than-expected outcome, others like the arbitrage do not and are crucial
+to the system by providing market stability.
 
+In this scope, the thesis will first formalize the building blocks of
+decentralized finance, which are the automated market makers, and together with
+this frame the optimization problem resembling the arbitrage opportunity. The
+optimization problem will be mathematically analyzed and based on the
+analysis an algorithm will be proposed for efficient computation of the
+solution. In the pre-thesis setting while brainstorming about the solutions to
+the problem an interesting question emerged: How to spot an arbitrage
+opportunity?
 
+To answer this question in the time constraints given by the block building
+process and the rate of incoming transactions in the transaction pool, a
+reinforcement learning method is utilized. The agent will learn the policy
+and value functions of the Markov Decision Process by using deep graph neural
+networks with attention. The environment will resemble a graph with nodes
+being on-chain tokens and edges being on-chain pools. This formulation allows
+the question of finding the arbitrage opportunity to be framed as a
+combinatorial optimization problem. The agent will learn to navigate this
+graph to find a profitable arbitrage walk. The walk is propagated to
+construct the optimization problem and solve it.
+\vspace*{\fill}
 
 \end{document}
