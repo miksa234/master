@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 import torch
 from dotenv import dotenv_values
@@ -36,11 +36,11 @@ ARGS_TRAINING = {
     'num_self_play_iterations': 25,
     'num_parallel': 5,
     'num_epochs': 10,
-    'batch_size': 32,
+    'batch_size': 128,
     'temperature': 1.25,
     'eps': 0.25,
     'dirichlet_alpha': 0.3,
     'num_processes': 5,
     'multicore': True,
-    'telegram': False,
+    'telegram': True,
 }

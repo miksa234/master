@@ -250,7 +250,7 @@ def save_loss_and_states_and_update_me(
 
 def send_telegram_message(message):
     """
-    Make a telegrambot send a message.
+    Send a message through a telegram-bot.
 
     Parameters
     ----------

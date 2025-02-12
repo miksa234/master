@@ -66,7 +66,7 @@ class AgentRLearn:
         pbar = tqdm(
             total=total, desc='terminal states',
             token=TELEGRAM_TOKEN, chat_id=TELEGRAM_CHAT_ID,
-            disable=self.args['telegram']
+            disable=not self.args['telegram']
         )
         while len(p_memory) > 0:
             if len(p_memory) < total:
@@ -208,7 +208,7 @@ class AgentRLearn:
                     desc="self play",
                     token=TELEGRAM_TOKEN,
                     chat_id=TELEGRAM_CHAT_ID,
-                    disable=self.args['telegram']
+                    disable=not self.args['telegram']
                 ):
                     memory += self.self_play()
 
@@ -235,7 +235,7 @@ class AgentRLearn:
                 desc="epochs",
                 token=TELEGRAM_TOKEN,
                 chat_id=TELEGRAM_CHAT_ID,
-                disable=self.args['telegram']
+                disable=not self.args['telegram']
             ):
                 self.train(memory, iteration, epoch_iter)
 

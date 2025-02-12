@@ -259,4 +259,3 @@ class MDP:
                 policy[self.edge_list.index(e)] = 0
 
         return policy / policy.sum()
-

@@ -31,6 +31,3 @@ def brute_force_search_trail(graph, source):
         weights.append(np.exp(w))
 
     return trails, weights
-
-
-

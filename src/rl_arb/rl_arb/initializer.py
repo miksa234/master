@@ -124,5 +124,3 @@ class Initializer():
         self.optimizer = optimizer
         self.rlearn = rlearn
         self.mcts = mcts # not parallel version
-
-

@@ -479,4 +479,3 @@ class PMemory:
         self.memory = []
         self.root = None
         self.node = None
-
