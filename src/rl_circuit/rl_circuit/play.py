@@ -57,7 +57,7 @@ def run():
     L = nx.line_graph(G, create_using=nx.Graph)
     for e in G.edges(data=True):
         nx.set_node_attributes(L, {(e[0], e[1], e[2]['k']): e[2]['weight']}, name='mexr')
-        nx.set_node_attributes(L, {(e[0], e[1], e[2]['k']): e[2]['fee']}, name='fee')
+#        nx.set_node_attributes(L, {(e[0], e[1], e[2]['k']): e[2]['fee']}, name='fee')
         nx.set_node_attributes(L, {(e[0], e[1], e[2]['k']): e[2]['address']}, name='address')
 
 
@@ -130,7 +130,7 @@ def run():
         'C_2/3' : 2.0,
         'C_3/3' : 1.5,
         'num_iterations': 100,
-        'num_searches': 20,
+        'num_searches': 50,
         'num_self_play_iterations': 25,
         'num_parallel': 5,
         'num_epochs': 10,
@@ -143,11 +143,11 @@ def run():
     }
 
     args_model = {
-        'in_channels': 5,
-        'emb_channels': 320,
-        'num_heads': 20,
-        'num_layers': 10,
-        'ff_dim': 1280,
+        'in_channels': 4,
+        'emb_channels': 256,
+        'num_heads': 16,
+        'num_layers': 8,
+        'ff_dim': 1024,
         'policy_mheads': 1,
         'value_mheads': 1
     }
@@ -157,6 +157,7 @@ def run():
     ).to(DEVICE).share_memory()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.0001)
+    optimizer.zero_grad()
 
 #    model.load_state_dict(
 #        torch.load(

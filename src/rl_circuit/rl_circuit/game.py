@@ -183,6 +183,8 @@ class NetGame:
         if self.check_terminal(state):
             edge_list = state[1:]
             value = np.sum([np.log(self.edges[edge][self.current_block]*self.args['tau']) for edge in edge_list])*self.args['M']
+            if value > 0:
+                value /= len(edge_list)
             terminated = True
         return value, terminated
 
