@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-
 import pandas as pd
 import networkx as nx
 import numpy as np
-
+import torch
+import os
+import pickle
+import requests
+from .config import TELEGRAM_CHAT_ID, TELEGRAM_SEND_URL
 
 def load_pools_and_tokens(path_pools, path_tokens):
     """
@@ -184,3 +187,78 @@ def filter_pools_with_no_gradient(pools, prices):
     pools = pools[mask]
     prices = prices[prices['pool_address'].isin(list(pools['address']))]
     return pools, prices
+
+
+def save_loss_and_states_and_update_me(
+    policy_loss,
+    value_loss,
+    states,
+    iteration,
+    epoch_iter,
+    batch_idx,
+    telegram
+):
+    """
+    Saves policy, value losses and all the states run through the in the batch
+    at a given epoch. Also sends a message through a telegram bot on current
+    training state.
+
+    Parameters
+    ----------
+    policy_loss: torch.float
+        Policy loss.
+    value_loss: torch.float
+        Value loss.
+    states: list[list[tuple]].
+        List of states.
+    iteration: int
+        Current iteration number.
+    epoch_iter: int
+        Current epoch number.
+    batch_idx: int
+        Current batch index in the epoch.
+    telegram: bool
+        Send message via telegram or not.
+    """
+
+    if not os.path.exists('./model'):
+        os.mkdir('./model')
+    if not os.path.exists('./model/states'):
+        os.mkdir('./model/states')
+    if not os.path.exists('./model/loss'):
+        os.mkdir('./model/loss')
+
+    torch.save(
+        policy_loss,
+        f'./model/loss/policy_loss_{iteration}_{epoch_iter}_{batch_idx}.pt'
+    )
+    torch.save(
+        policy_loss,
+        f'./model/loss/value_loss_{iteration}_{epoch_iter}_{batch_idx}.pt'
+    )
+    with open(f'./model/states/state_{iteration}_{epoch_iter}_{batch_idx}.pickle', "wb") as f:
+        pickle.dump(states, f)
+
+    avg_state_len = np.mean(np.array([len(s) for s in states]))
+
+    if telegram:
+        message = f"""
+            ITR: {iteration} | EPOCH: {epoch_iter} | BATCH_IDX: {batch_idx}
+            Policy loss: {policy_loss}
+            Value loss: {value_loss}
+            Total loss: {policy_loss + value_loss}
+            Average state length: {avg_state_len}
+        """
+        send_telegram_message(message)
+
+
+def send_telegram_message(message):
+    """
+    Make a telegrambot send a message.
+
+    Parameters
+    ----------
+    message: str
+        String containing the message to be sent by the bot.
+    """
+    requests.post(TELEGRAM_SEND_URL, json={'chat_id': TELEGRAM_CHAT_ID, 'text': message})

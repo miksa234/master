@@ -3,6 +3,7 @@
 from .mcts import MCTS, MCTSParallel, PMemory
 from .game import NetGame
 from .config import DEVICE
+from .utils import save_loss_and_states_and_update_me, send_telegram_message
 
 
 import numpy as np
@@ -115,7 +116,7 @@ class AgentRLearn:
         return return_mem
 
 
-    def train(self, memory):
+    def train(self, memory, iteration, epoch_iter):
         """
         Trains the model using the provided memory of game states and outcomes.
 
@@ -158,6 +159,10 @@ class AgentRLearn:
             value_loss = F.mse_loss(value_outs, value_targets)
             loss = policy_loss + value_loss
 
+            save_loss_and_states_and_update_me(
+                policy_loss, value_loss, states,
+                iteration, epoch_iter, batch_idx, self.args['telegram']
+            )
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -187,7 +192,9 @@ class AgentRLearn:
         Main loop for the learning process, including self-play and training.
         """
         for iteration in range(self.args['num_iterations']):
-            logger.info(f"Iterations {iteration+1}/{self.args['num_iterations']}")
+            logger.info(f"Iterations: {iteration+1}/{self.args['num_iterations']}")
+            if self.args['telegram']:
+                send_telegram_message(f"Iterations: {iteration+1}/{self.args['num_iterations']}")
 
             self.adapt_exploration_parameter(iteration)
 
@@ -197,6 +204,7 @@ class AgentRLearn:
                 # single core self-play
                 for play_iter in tqdm(range(self.args['num_self_play_iterations']//self.args['num_parallel']), desc="self play"):
                     memory += self.self_play()
+
             else:
                 # multicore self-play
                 play_iter = self.args['num_self_play_iterations']
@@ -216,10 +224,11 @@ class AgentRLearn:
 
             self.model.train()
             for epoch_iter in tqdm(range(self.args['num_epochs']), desc="epochs"):
-                self.train(memory)
+                self.train(memory, iteration, epoch_iter)
 
             torch.save(self.model.state_dict(), f"./model/model_{iteration}.pt")
             torch.save(self.optimizer.state_dict(), f"./model/optimizer_{iteration}.pt")
+
 
 
 def self_play_num_times(rlearn, times=100):
