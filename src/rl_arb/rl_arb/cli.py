@@ -11,7 +11,7 @@ logger = logging.getLogger('rl_circuit')
 
 def run():
     """
-    Small cli interface.
+    Small cli for interaction.
     """
     logger.info("Started...")
     help = """
@@ -45,9 +45,11 @@ def run():
                 logger.info("Not on frame, closing...")
 
         elif sys.argv[1] == "vsc5":
+            cwd = os.getcwd()
+            data_path = "/gpfs/data/fs70700/miksa234"
             logger.info("Copying code...")
-            subprocess.getoutput(f"rsync -Pr {cwd} vsc5:/gpfs/data/fs70700/miksa234")
-            subprocess.getoutput("ssh -4 vsc5 'cd $DATA && sbatch rl.job")
+            subprocess.getoutput(f"rsync -Pr {cwd} vsc5:{data_path}")
+            logger.info(subprocess.getoutput(f"ssh -4 vsc5 'cd {data_path} && sbatch rl.job'"))
 
         elif sys.argv[1] == "learn":
             problem = Initializer()
