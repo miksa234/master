@@ -129,7 +129,7 @@ class MDP:
         last_node = state[-1][1]
         filter_edges = []
         for e in state[1:]:
-            filter_edges.append((e[0], e[1], e[2]))
+            filter_edges.append((e[1], e[0], e[2]))
             filter_edges.append(e)
 
         valid_actions = [e for e in self.G.edges(last_node, data='k') if e not in filter_edges]
@@ -179,6 +179,10 @@ class MDP:
         if len(state) <= 1 and len(valid_actions) > 0:
             value = 0
             terminated = False
+        if len(state) >= self.args['cutoff']:
+            value = -len(state)/(len(self.edges)//2)
+            #value = -1
+            #terminated = True
 
         if self.check_terminal(state):
             edge_list = state[1:]

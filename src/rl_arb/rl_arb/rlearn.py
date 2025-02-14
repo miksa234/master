@@ -14,7 +14,7 @@ from rl_arb.config import *
 from rl_arb.utils import *
 
 
-class AgentRLearn:
+class AgentRLearn():
     def __init__(self, model, optimizer, mdp: MDP, args):
         """
         RL algorithm class for training and self-play using Monte Carlo Tree
@@ -36,15 +36,18 @@ class AgentRLearn:
         self_play()
             Executes self-play to generate training data.
         train(memory)
-            Trains the model using the provided memory of mdp states and outcomes.
+            Trains the model using the training data from self_play.
         learn()
-            Main loop for the learning process, including self-play and training.
+            Main loop for the learning process, including self_play and training.
         """
         self.model = model
         self.optimizer = optimizer
         self.mdp = mdp
         self.args = args
         self.mcts = MCTSParallel(self.mdp, self.args, self.model)
+
+        self.loss = []
+        self.avg_state_len = []
 
 
     def self_play(self):
@@ -62,23 +65,12 @@ class AgentRLearn:
         self.mdp.current_block = at_block
         p_memory = [PMemory(self.mdp, at_block) for _ in range(self.args['num_parallel'])]
 
-        total = len(p_memory)
-        pbar = tqdm(
-            total=total, desc='terminal states',
-            token=TELEGRAM_TOKEN, chat_id=TELEGRAM_CHAT_ID,
-            disable=not self.args['telegram']
-        )
         while len(p_memory) > 0:
-            if len(p_memory) < total:
-                pbar.update(1)
-                total = len(p_memory)
-
             states = [mem.state for mem in p_memory]
             self.mcts.search(states, p_memory)
 
             for i in range(len(p_memory))[::-1]:
                 mem = p_memory[i]
-
                 probs = np.zeros(len(self.mdp.edge_list))
                 for child in mem.root.children:
                     probs[
@@ -125,12 +117,14 @@ class AgentRLearn:
             A list of tuples containing mdp states, policy probabilities,
             value estimates, and block indices.
         """
+        epoch_policy_loss = []
+        epoch_value_loss = []
         np.random.shuffle(memory)
         for batch_idx in range(0, len(memory), self.args['batch_size']):
             sample = memory[batch_idx:np.min([len(memory) - 1, batch_idx + self.args['batch_size']])]
             try:
                 states , policy_targets, value_targets, block_indices = zip(*sample)
-            except ValueError:
+            except ValueError: # batch is len 0.
                 print(f"batch_idx {batch_idx}")
                 print(f"From-TO : {[batch_idx, np.min([len(memory) - 1, batch_idx + self.args['batch_size']])]}")
                 print(f"len memory {len(memory)}")
@@ -138,7 +132,8 @@ class AgentRLearn:
                 continue
 
             policy_targets, value_targets = np.array(policy_targets), np.array(value_targets)
-            policy_targets, value_targets = torch.tensor(policy_targets).to(DEVICE).float(), torch.tensor(value_targets).to(DEVICE).float()
+            policy_targets = torch.tensor(policy_targets).to(DEVICE).float()
+            value_targets = torch.tensor(value_targets).to(DEVICE).float().unsqueeze(1)
 
 
             value_outs, policy_outs = [], []
@@ -151,22 +146,30 @@ class AgentRLearn:
                 value_outs += v
                 policy_outs += p
 
-            value_outs = torch.stack(value_outs).to(DEVICE)
+            value_outs = torch.stack(value_outs).to(DEVICE).unsqueeze(1)
             policy_outs = torch.stack(policy_outs).to(DEVICE)
 
             policy_loss = F.cross_entropy(policy_outs, policy_targets)
             value_loss = F.mse_loss(value_outs, value_targets)
             loss = policy_loss + value_loss
 
+            self.loss.append([policy_loss.item(), value_loss.item()])
+            epoch_policy_loss.append(policy_loss.item())
+            epoch_value_loss.append(value_loss.item())
+
+            self.avg_state_len.append(
+                np.mean(np.array([len(s) for s in states]))
+            )
 
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
 
-        if epoch_iter == self.args['num_epochs']-1:
-            save_loss_and_states_and_update_me(
-                policy_loss, value_loss, states,
-                iteration, self.args['telegram']
+        if self.args['telegram']:
+            update_me(
+                np.mean(epoch_policy_loss), np.mean(epoch_value_loss),
+                self.avg_state_len[-1],
+                epoch_iter, iteration
             )
 
     def adapt_exploration_parameter(self, iteration):
@@ -242,6 +245,8 @@ class AgentRLearn:
             torch.save(self.model.state_dict(), f"./model/model_{iteration}.pt")
             torch.save(self.optimizer.state_dict(), f"./model/optimizer_{iteration}.pt")
 
+        save_loss(self.loss, self.avg_state_len)
+
 
 
 def self_play_num_times(rlearn, times=100):
@@ -261,6 +266,13 @@ def self_play_num_times(rlearn, times=100):
         A list of tuples containing mdp states, policy probabilities, value estimates, and block indices.
     """
     memory = []
+
+    pbar = tqdm(
+        total=times, desc='multiprocess self play',
+        token=TELEGRAM_TOKEN, chat_id=TELEGRAM_CHAT_ID,
+        disable=not rlearn.args['telegram']
+    )
     for _ in range(times):
         memory += rlearn.self_play()
+        pbar.update(1)
     return memory

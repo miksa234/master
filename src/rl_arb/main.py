@@ -2,9 +2,6 @@
 
 from rl_arb.cli import run
 
-import subprocess
-import os
-
 def main():
     run()
 

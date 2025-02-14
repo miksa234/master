@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import networkx as nx
 import pandas as pd
 import numpy as np
@@ -82,9 +83,11 @@ class Initializer():
             )
         L, line_mapping = linear_node_relabel(L)
 
-        for (t0, t1, d) in G.edges(data=True):
+        edges = list(G.edges(data=True))
+        for (t0, t1, d) in edges:
             inverse_weights = [1/el for el in d['weight']]
             G.add_edge(t1, t0, k=d['k'], weight=inverse_weights, address=d['address'])
+
 
         edge_list = [list(e) for e in L.edges()]
         rates = np.array([np.log(e[-1]['mexr']) for e in L.nodes(data=True)]).T
@@ -108,6 +111,9 @@ class Initializer():
         mcts = MCTS(mdp, ARGS_TRAINING, model)
 
         rlearn = AgentRLearn(model, optimizer, mdp, ARGS_TRAINING)
+
+        if not os.path.exists('./model'):
+            os.mkdir('./model')
 
         self.pools = pools
         self.tokens = tokens

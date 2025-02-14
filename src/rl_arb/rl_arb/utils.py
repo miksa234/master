@@ -190,18 +190,29 @@ def filter_pools_with_no_gradient(pools, prices):
     prices = prices[prices['pool_address'].isin(list(pools['address']))]
     return pools, prices
 
+def save_loss(
+    loss,
+    avg_state_len
+):
+    if not os.path.exists('./model/loss'):
+        os.mkdir('./model/loss')
 
-def save_loss_and_states_and_update_me(
+    with open(f'./model/loss/loss.pickle', "wb") as f:
+        pickle.dump(loss, f)
+
+    with open(f'./model/loss/avg_state_len.pickle', "wb") as f:
+        pickle.dump(avg_state_len, f)
+
+
+def update_me(
     policy_loss,
     value_loss,
-    states,
+    avg_state_len,
+    epoch_iter,
     iteration,
-    telegram
 ):
     """
-    Saves policy, value losses and all the states run through the in the batch
-    at a given epoch. Also sends a message through a telegram bot on current
-    training state.
+    Sends a message through a telegram bot on current training progress
 
     Parameters
     ----------
@@ -213,39 +224,20 @@ def save_loss_and_states_and_update_me(
         List of states.
     iteration: int
         Current iteration number.
+    epoch: int
+        current_epoch.
     telegram: bool
         Send message via telegram or not.
     """
 
-    if not os.path.exists('./model'):
-        os.mkdir('./model')
-    if not os.path.exists('./model/states'):
-        os.mkdir('./model/states')
-    if not os.path.exists('./model/loss'):
-        os.mkdir('./model/loss')
-
-    torch.save(
-        policy_loss,
-        f'./model/loss/policy_loss_{iteration}.pt'
-    )
-    torch.save(
-        policy_loss,
-        f'./model/loss/value_loss_{iteration}.pt'
-    )
-    with open(f'./model/states/state_{iteration}.pickle', "wb") as f:
-        pickle.dump(states, f)
-
-    avg_state_len = np.mean(np.array([len(s) for s in states]))
-
-    if telegram:
-        message = f"""
-            ITR: {iteration} | EPOCH: {epoch_iter} | BATCH_IDX: {batch_idx}
-            Policy loss: {policy_loss}
-            Value loss: {value_loss}
-            Total loss: {policy_loss + value_loss}
-            Average state length: {avg_state_len}
-        """
-        send_telegram_message(message)
+    message = f"""
+        ITR: {iteration+1} | EPOCH: {epoch_iter}
+        Policy loss: {policy_loss}
+        Value loss: {value_loss}
+        Total loss: {policy_loss + value_loss}
+        Average state length: {avg_state_len}
+    """
+    send_telegram_message(message)
 
 
 def send_telegram_message(message):
