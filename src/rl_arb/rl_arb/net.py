@@ -6,6 +6,8 @@ from torch.nn import functional as F
 from torch_geometric.nn import BatchNorm, GATv2Conv, Sequential, Linear
 
 import logging
+
+from torch_geometric.nn.glob import global_mean_pool
 logger = logging.getLogger('rl_circuit')
 
 from rl_arb.config import DEVICE
@@ -79,7 +81,7 @@ class Net(nn.Module):
         ])
 
 
-    def forward(self, node_attr, edge_index):
+    def forward(self, node_attr, edge_index, batch=None):
         """
         Forward pass of the ResNet model.
 
@@ -100,7 +102,7 @@ class Net(nn.Module):
             x = block(x, edge_index)
 
         policy = self.policy_head(x, edge_index).flatten().unsqueeze(0)
-        value = torch.tensor([self.value_head(x, edge_index).mean()])
+        value = global_mean_pool(self.value_head(x, edge_index), batch)
 
         return value, policy
 

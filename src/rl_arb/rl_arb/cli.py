@@ -5,9 +5,10 @@ import os
 import subprocess
 
 from rl_arb.initializer import Initializer
+from rl_arb.utils import log_info, send_telegram_message
+from rl_arb.brute_force import test_model
 from rl_arb.logger import logging
 logger = logging.getLogger('rl_circuit')
-
 
 def run():
     """
@@ -33,8 +34,12 @@ def run():
                 logger.info("Copying code...")
                 subprocess.getoutput(f"rsync -Pr {cwd} mycomp:~/")
                 logger.info("Executing code remotely...")
+                if sys.argv[2] == "test":
+                    cmd = "test"
+                else:
+                    cmd = "learn"
                 with subprocess.Popen(
-                    "ssh -4 mycomp 'source py_env/bin/activate && cd ./rl_arb && ./main.py learn'",
+                    f"ssh -4 mycomp 'source py_env/bin/activate && cd ./rl_arb && ./main.py {cmd}'",
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     shell=True
@@ -54,11 +59,20 @@ def run():
         elif sys.argv[1] == "learn":
             problem = Initializer()
             problem.rlearn.learn()
+
+        elif sys.argv[1] == "info":
+            problem = Initializer()
+            log_info(problem)
+
+        elif sys.argv[1] == "test":
+            test_model()
+
         else:
             logger.info("No valid input detected")
             logger.info(help)
     except IndexError as e:
         logger.info("No valid input detected")
+        logger.info(f"Error {e}")
         logger.info(help)
 
     logger.info("END")

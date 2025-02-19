@@ -2,8 +2,10 @@
 
 import numpy as np
 import torch
+from torch_geometric.data import Batch, Data
 
 import logging
+
 logger = logging.getLogger('rl_circuit')
 
 class Node:
@@ -148,11 +150,7 @@ class Node:
         float
             The UCB value for the child node using the AlphaZero method.
         """
-        if child.visit_count == 0:
-            q_value = 0
-        else:
-            q_value = ((child.value_sum / child.visit_count) + 1) / 2
-
+        q_value = child.value_sum / (child.visit_count + 1)
         return q_value + self.args['C'] * np.sqrt(self.visit_count)/(child.visit_count + 1) * child.prior
 
     def expand(self, mdp):
@@ -292,16 +290,15 @@ class MCTS:
         )
         policy = torch.softmax(policy.squeeze(0), dim=0).detach().cpu().numpy()
 
-        # dirichlet random noise
-        policy = (1-self.args['eps']) * policy \
-            + self.args['eps'] * np.random.dirichlet([self.args['dirichlet_alpha']]) * np.ones(policy.shape)
+#         dirichlet random noise
+#        policy = (1-self.args['eps']) * policy \
+#            + self.args['eps'] * np.random.dirichlet([self.args['dirichlet_alpha']]*len(self.mdp.edges))
         policy = self.mdp.mask_policy(policy, root.state)
 
         root.expand_alphazero(policy, self.mdp)
 
-        for s in range(self.args['num_searches']):
+        for s in range(self.args['num_searches']-len(state)):
             node = root
-            # selection
             while node.is_fully_expanded():
                 node = node.select()
 
@@ -318,16 +315,9 @@ class MCTS:
 
                 value = value.item()
 
-                # expansion
                 node.expand_alphazero(policy, self.mdp)
 
-                # simulation not needed for AlphaZero
-                # node = node.expand()
-                # value = node.simulate()
 
-
-
-            # backpropagation
             node.backpropagete(value)
 
         # return visit_count distribution
@@ -393,19 +383,26 @@ class MCTSParallel:
         p_memory : list[Pmemory]
             The list of PMemory objects for parallel search.
         """
-        policy = []
-        for i, s in enumerate(states):
-            policy += self.model(
-                self.mdp.encode_state(s),
-                self.mdp.data.edge_index
-            )[1]
 
-        policy = torch.stack(policy)
+        # batch data
+        data_list = [
+            Data(x=self.mdp.encode_state(s), edge_index=self.mdp.data.edge_index)\
+            for s in states
+        ]
+        batch = Batch.from_data_list(data_list)
+        _, policy = self.model.forward(batch.x, batch.edge_index, batch.batch)
+        policy = policy.view(batch.batch_size, -1)
+        del batch
+        del data_list
         policy = torch.softmax(policy, dim=1).detach().cpu().numpy()
 
         # dirichlet random noise
         policy = (1-self.args['eps']) * policy \
-            + self.args['eps'] * np.random.dirichlet([self.args['dirichlet_alpha']]) * np.ones(policy.shape)
+            + self.args['eps'] \
+            * np.random.dirichlet(
+                    [self.args['dirichlet_alpha']]*len(self.mdp.edges),
+                    size=policy.shape[0]
+            )
 
         for i, mem in enumerate(p_memory):
             p_policy = torch.tensor(policy[i])
@@ -414,7 +411,7 @@ class MCTSParallel:
             mem.root = Node(self.mdp, self.args, states[i], visit_count=1)
             mem.root.expand_alphazero(p_policy, self.mdp)
 
-        for _ in range(self.args['num_searches']):
+        for _ in range(self.args['num_searches']-len(states[0])+1):
             for mem in p_memory:
                 mem.node = None
                 node = mem.root
@@ -432,22 +429,25 @@ class MCTSParallel:
 
             if len(expandable) > 0:
                 value, policy = [], []
-                for i in expandable:
-                    v, p = self.model(
-                        self.mdp.encode_state(p_memory[i].node.state),
-                        self.mdp.data.edge_index
-                    )
-                    value += v
-                    policy += p
-                policy = torch.stack(policy)
-                value = torch.stack(value)
-
+                data_list = [
+                    Data(
+                        x=self.mdp.encode_state(p_memory[i].node.state),
+                        edge_index=self.mdp.data.edge_index
+                    )\
+                    for i in expandable
+                ]
+                batch = Batch.from_data_list(data_list)
+                value, policy = self.model.forward(
+                    batch.x,
+                    batch.edge_index,
+                    batch.batch
+                )
+                policy = policy.view(batch.batch_size, -1)
                 policy = torch.softmax(policy, dim=1)
 
             for i, idx in enumerate(expandable):
                 node = p_memory[idx].node
                 p_value, p_policy = value[i], policy[i]
-
                 p_policy = self.mdp.mask_policy(p_policy, node.state)
 
                 node.expand_alphazero(p_policy, self.mdp)

@@ -3,15 +3,24 @@
 import numpy as np
 import torch
 from torch.nn import functional as F
+from torch_geometric.data import Batch, Data
 import torch.multiprocessing as mp
 from tqdm.contrib.telegram import tqdm
 import logging
 logger = logging.getLogger('rl_circuit')
 
-from rl_arb.mcts import *
-from rl_arb.mdp import *
-from rl_arb.config import *
-from rl_arb.utils import *
+from rl_arb.mdp import MDP
+from rl_arb.mcts import MCTSParallel, PMemory
+from rl_arb.config import (
+    DEVICE,
+    TELEGRAM_TOKEN,
+    TELEGRAM_CHAT_ID,
+)
+from rl_arb.utils import (
+        update_me,
+        send_telegram_message,
+        save_loss
+)
 
 
 class AgentRLearn():
@@ -48,6 +57,7 @@ class AgentRLearn():
 
         self.loss = []
         self.avg_state_len = []
+        self.pbar_play = False
 
 
     def self_play(self):
@@ -65,8 +75,20 @@ class AgentRLearn():
         self.mdp.current_block = at_block
         p_memory = [PMemory(self.mdp, at_block) for _ in range(self.args['num_parallel'])]
 
+
+        if self.pbar_play:
+            pbar = tqdm(
+                total=self.args['num_parallel'], desc='self_play',
+                token=TELEGRAM_TOKEN, chat_id=TELEGRAM_CHAT_ID,
+                disable=not self.args['telegram']
+            )
+
         while len(p_memory) > 0:
+
             states = [mem.state for mem in p_memory]
+            if self.pbar_play:
+                pbar.set_description(f"self_play state_len {len(states[0])}")
+
             self.mcts.search(states, p_memory)
 
             for i in range(len(p_memory))[::-1]:
@@ -88,7 +110,7 @@ class AgentRLearn():
 
                 action_idx = np.random.choice(
                     list(range(len(self.mdp.edge_list))),
-                    p=probs
+                    p=temp_probs
                 )
                 action = self.mdp.edge_list[action_idx]
 
@@ -96,6 +118,8 @@ class AgentRLearn():
                 value, is_terminal = self.mdp.get_value_and_terminated(mem.state)
 
                 if is_terminal:
+                    if self.pbar_play:
+                        pbar.update(1)
                     for hist_state, hist_probs in mem.memory:
                         return_mem.append((
                             hist_state,
@@ -104,6 +128,7 @@ class AgentRLearn():
                             at_block,
                         ))
                     del p_memory[i]
+
         return return_mem
 
 
@@ -136,18 +161,22 @@ class AgentRLearn():
             value_targets = torch.tensor(value_targets).to(DEVICE).float().unsqueeze(1)
 
 
-            value_outs, policy_outs = [], []
-            for i, s in enumerate(states):
-                self.mdp.current_block = block_indices[i]
-                v, p = self.model(
-                    self.mdp.encode_state(s),
-                    self.mdp.data.edge_index
-                )
-                value_outs += v
-                policy_outs += p
-
-            value_outs = torch.stack(value_outs).to(DEVICE).unsqueeze(1)
-            policy_outs = torch.stack(policy_outs).to(DEVICE)
+            data_list = [
+                Data(
+                    x=self.mdp.encode_state(s),
+                    edge_index=self.mdp.data.edge_index
+                 )\
+                for s in states
+            ]
+            batch = Batch.from_data_list(data_list)
+            value_outs, policy_outs = self.model.forward(
+                batch.x,
+                batch.edge_index,
+                batch.batch
+            )
+            policy_outs = policy_outs.view(batch.batch_size, -1)
+            del batch
+            del data_list
 
             policy_loss = F.cross_entropy(policy_outs, policy_targets)
             value_loss = F.mse_loss(value_outs, value_targets)
@@ -156,7 +185,6 @@ class AgentRLearn():
             self.loss.append([policy_loss.item(), value_loss.item()])
             epoch_policy_loss.append(policy_loss.item())
             epoch_value_loss.append(value_loss.item())
-
             self.avg_state_len.append(
                 np.mean(np.array([len(s) for s in states]))
             )
@@ -202,10 +230,14 @@ class AgentRLearn():
 
             self.adapt_exploration_parameter(iteration)
 
+
             memory = []
             self.model.eval()
             if not self.args['multicore']:
                 # single core self-play
+                self.model.to(DEVICE)
+                self.mdp.data.to(DEVICE)
+                self.mdp.device = DEVICE
                 for play_iter in tqdm(
                     range(self.args['num_self_play_iterations']//self.args['num_parallel']),
                     desc="self play",
@@ -216,6 +248,10 @@ class AgentRLearn():
                     memory += self.self_play()
 
             else:
+                cpu = torch.device('cpu')
+                self.model.to(cpu)
+                self.mdp.data.to(cpu)
+                self.mdp.device = cpu
                 # multicore self-play
                 play_iter = self.args['num_self_play_iterations']
                 num_parallel = self.args['num_parallel']
@@ -225,9 +261,16 @@ class AgentRLearn():
                 with mp.Pool(processes=num_processes) as pool:
                     results = pool.starmap(
                         self_play_num_times,
-                        [(self, per_processor) for _ in range(num_processes)]
+                        [(self, per_processor, 'cuda:0', True)] +\
+                        [(self, per_processor, 'cuda:0', False) for _ in range(num_processes//2 - 1)] +\
+                        [(self, per_processor, 'cuda:1', False) for _ in range(num_processes//2 - 1)] +\
+                        [(self, per_processor, 'cuda:1', True)]
                     )
                     pool.terminate()
+
+                self.model.to(DEVICE)
+                self.mdp.data.to(DEVICE)
+                self.mdp.device = DEVICE
 
                 for result in results:
                     memory += result
@@ -246,10 +289,12 @@ class AgentRLearn():
             torch.save(self.optimizer.state_dict(), f"./model/optimizer_{iteration}.pt")
 
         save_loss(self.loss, self.avg_state_len)
+        if self.args['telegram']:
+            send_telegram_message("DONE!")
 
 
 
-def self_play_num_times(rlearn, times=100):
+def self_play_num_times(rlearn, times=100, device='cpu', pbar=False):
     """
     Helper function to perform self-play multiple times.
 
@@ -267,12 +312,10 @@ def self_play_num_times(rlearn, times=100):
     """
     memory = []
 
-    pbar = tqdm(
-        total=times, desc='multiprocess self play',
-        token=TELEGRAM_TOKEN, chat_id=TELEGRAM_CHAT_ID,
-        disable=not rlearn.args['telegram']
-    )
+    rlearn.pbar_play = pbar
+    rlearn.model.to(device)
+    rlearn.mdp.data.to(device)
+    rlearn.mdp.device = device
     for _ in range(times):
         memory += rlearn.self_play()
-        pbar.update(1)
     return memory

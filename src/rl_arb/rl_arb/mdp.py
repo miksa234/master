@@ -6,6 +6,8 @@ import numpy as np
 from torch_geometric.data import Data
 
 from rl_arb.config import DEVICE
+from rl_arb.logger import logging
+logger = logging.getLogger('rl_circuit')
 
 class MDP:
     """
@@ -38,7 +40,7 @@ class MDP:
         Returns the next state given the current state and action.
     get_valid_actions(state):
         Returns the valid actions from the current state.
-    check_terminal(state):
+    check_win(state):
         Checks if the current state is a terminal state.
     get_value_and_terminated(state):
         Returns the value and whether the state is terminal.
@@ -77,11 +79,14 @@ class MDP:
         self.edges = {(i, j, w['k']): w['weight'] for i, j, w in G.edges(data=True)}
         self.nodes = list(G.nodes)
         self.edge_list = list(self.edges.keys())
+        self.action_size = len(self.edge_list)
 
         self.data = data
         self.line_mapping = line_mapping
-        self.num_blocks = len(list(self.edges.items())[0][1])
+        self.line_mapping_keys = list(self.line_mapping.keys())
+        self.num_blocks = len(list(self.edges.items())[0][1])-1
         self.current_block = self.num_blocks
+        self.device = DEVICE
 
     def set_current_block(self, block_index):
         """
@@ -126,16 +131,14 @@ class MDP:
         list
             The valid actions represented as edges.
         """
-        last_node = state[-1][1]
-        filter_edges = []
-        for e in state[1:]:
-            filter_edges.append((e[1], e[0], e[2]))
-            filter_edges.append(e)
+        current_node = state[-1][1]
+        filter_edges = [e for e in state[1:]] +\
+            [(e[1], e[0], e[2]) for e in state[1:]]
 
-        valid_actions = [e for e in self.G.edges(last_node, data='k') if e not in filter_edges]
+        valid_actions = [e for e in self.G.edges(current_node, data='k') if e not in filter_edges]
         return valid_actions
 
-    def check_terminal(self, state):
+    def check_win(self, state):
         """
         Checks if the current state is a terminal state.
 
@@ -171,25 +174,19 @@ class MDP:
         terminated = False
 
         if len(valid_actions) == 0:
-            value = 0
-            terminated = True
-        if len(state) <= 1 and len(valid_actions) == 0:
-            value = -1
-            terminated = True
-        if len(state) <= 1 and len(valid_actions) > 0:
-            value = 0
-            terminated = False
-        if len(state) >= self.args['cutoff']:
-            value = -len(state)/(len(self.edges)//2)
-            #value = -1
-            #terminated = True
+            return -1, True
 
-        if self.check_terminal(state):
-            edge_list = state[1:]
-            value = np.sum([np.log(self.edges[edge][self.current_block]*self.args['tau']) for edge in edge_list])*self.args['M']
-            if value > 0:
-                value /= len(edge_list)
+        if len(state) >= self.args['cutoff']:
+            value += -len(state)/(len(self.edges)//2)
             terminated = True
+
+        if self.check_win(state):
+            profit = np.log(self.calculate_profit(state))
+            if profit > 0:
+                profit *= self.args['M']
+            value += 1 + profit
+            terminated = True
+
         return value, terminated
 
     def encode_state(self, state):
@@ -207,10 +204,8 @@ class MDP:
             The encoded state tensor.
         """
         e_x = self.data.x.detach().clone()
-        # get the right prices for the block
         e_x= torch.dstack([
             e_x[:, self.current_block],       # exchange rate
-#            e_x[:, self.num_blocks-1+1],      # swap fee
             e_x[:, self.num_blocks-1+1],      # used binary
             e_x[:, self.num_blocks-1+2],      # t0 binary
             e_x[:, self.num_blocks-1+3],      # t1 binary
@@ -238,7 +233,7 @@ class MDP:
                     edge_idx.append(self.line_mapping[(e[1], e[0], e[2])])
             e_x[edge_idx, 1] = 1
 
-        return e_x.to(DEVICE)
+        return e_x.to(self.device)
 
     def mask_policy(self, policy, state):
         """
@@ -257,9 +252,17 @@ class MDP:
             The masked policy tensor.
         """
         valid_actions = self.get_valid_actions(state)
+        valid_indices = torch.tensor(
+            [self.edge_list.index(e) for e in valid_actions]
+        )
 
-        for e in self.edge_list:
-            if e not in valid_actions:
-                policy[self.edge_list.index(e)] = 0
+        mask = torch.zeros_like(policy)
+        mask[valid_indices] = 1
 
-        return policy / policy.sum()
+        masked_policy = policy * mask
+        return masked_policy / masked_policy.sum()
+
+    def calculate_profit(self, state):
+       return np.prod(
+            [self.edges[edge][self.current_block] for edge in state[1:]]
+        )

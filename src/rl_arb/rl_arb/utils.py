@@ -7,8 +7,11 @@ import torch
 import os
 import pickle
 import requests
+from torch_geometric.nn import summary
 
 from rl_arb.config import TELEGRAM_CHAT_ID, TELEGRAM_SEND_URL
+from rl_arb.logger import logging
+logger = logging.getLogger('rl_circuit')
 
 def load_pools_and_tokens(path_pools, path_tokens):
     """
@@ -64,7 +67,11 @@ def make_price(price):
         else:
             t0 = int(p['reserve_t0'])
             t1 = int(p['reserve_t1'])
-            block_price.append(t1/t0)
+            if t0 == 0:
+                price = 0
+            else:
+                price = t1/t0
+            block_price.append(price)
     return block_price
 
 
@@ -250,3 +257,17 @@ def send_telegram_message(message):
         String containing the message to be sent by the bot.
     """
     requests.post(TELEGRAM_SEND_URL, json={'chat_id': TELEGRAM_CHAT_ID, 'text': message})
+
+
+def log_info(problem):
+    """
+    Log model summary. as from.
+    """
+    l_p = len(problem.pools)
+    x = torch.randn(l_p, 4)
+    edge_index = torch.randint(
+        l_p,
+        size=problem.graph_data.edge_index.shape
+    )
+    logger.info("\n"+summary(problem.model, x, edge_index))
+

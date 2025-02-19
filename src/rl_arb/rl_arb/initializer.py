@@ -15,12 +15,21 @@ except RuntimeError:
    pass
 
 from rl_arb.mdp import MDP
-from rl_arb.config import *
 from rl_arb.mcts import MCTS
 from rl_arb.net import Net
 from rl_arb.rlearn import AgentRLearn
-from rl_arb.utils import *
-from rl_arb.brute_force import *
+from rl_arb.config import (
+    DEVICE,
+    ARGS_GAME,
+    ARGS_MODEL,
+    ARGS_TRAINING
+)
+from rl_arb.utils import (
+    load_pools_and_tokens,
+    make_token_graph,
+    linear_node_relabel,
+    filter_pools_with_no_gradient
+)
 
 
 class Initializer():
@@ -58,11 +67,11 @@ class Initializer():
     """
     def __init__(self):
         pools, tokens = load_pools_and_tokens(
-            '../data/pools/pools_deg_15_liq_100_block_18.csv',
+            '../data/pools/pools_deg_25_liq_100_block_18.csv',
             '../data/tokens/tokens.csv',
         )
         prices = pd.read_parquet(
-            '../data/prices/prices_deg_15_liq_100_block_18.parquet'
+            '../data/prices/prices_deg_25_liq_100_block_18_gap_4.parquet'
         )
         pools, prices = filter_pools_with_no_gradient(pools, prices)
 
@@ -88,24 +97,24 @@ class Initializer():
             inverse_weights = [1/el for el in d['weight']]
             G.add_edge(t1, t0, k=d['k'], weight=inverse_weights, address=d['address'])
 
-
         edge_list = [list(e) for e in L.edges()]
         rates = np.array([np.log(e[-1]['mexr']) for e in L.nodes(data=True)]).T
         used = [0 for _ in range(len(L.nodes))]
         t0_using = [0 for _ in range(len(L.nodes))]
         t1_using = [0 for _ in range(len(L.nodes))]
 
+
         node_attr  = torch.tensor(np.dstack([*rates, used, t0_using, t1_using])).float().squeeze(0)
         edge_index = torch.tensor(edge_list).t().contiguous()
-        data = Data(x=node_attr, edge_index=edge_index).to(DEVICE)
+        data = Data(x=node_attr, edge_index=edge_index)
 
         mdp = MDP(G, data, line_mapping, ARGS_GAME)
 
         model = Net(
             ARGS_MODEL
-        ).to(DEVICE).share_memory()
+        ).share_memory()
 
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.0001)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
         optimizer.zero_grad()
 
         mcts = MCTS(mdp, ARGS_TRAINING, model)
