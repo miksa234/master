@@ -67,11 +67,11 @@ class Initializer():
     """
     def __init__(self):
         pools, tokens = load_pools_and_tokens(
-            '../data/pools/pools_deg_25_liq_100_block_18.csv',
+            '../data/pools/pools_deg_5_liq_100_block_18_paths_2.csv',
             '../data/tokens/tokens.csv',
         )
         prices = pd.read_parquet(
-            '../data/prices/prices_deg_25_liq_100_block_18_gap_4.parquet'
+            '../data/prices/prices_deg_5_liq_100_block_18_gap_4.parquet'
         )
         pools, prices = filter_pools_with_no_gradient(pools, prices)
 
@@ -114,12 +114,12 @@ class Initializer():
             ARGS_MODEL
         ).share_memory()
 
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
         optimizer.zero_grad()
 
         mcts = MCTS(mdp, ARGS_TRAINING, model)
 
-        rlearn = AgentRLearn(model, optimizer, mdp, ARGS_TRAINING)
+        rlearn = AgentRLearn(model, mdp, ARGS_TRAINING)
 
         if not os.path.exists('./model'):
             os.mkdir('./model')

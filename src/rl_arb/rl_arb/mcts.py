@@ -30,8 +30,8 @@ class Node:
         The list of child nodes.
     expandable_actions : list
         The list of actions that can be taken from this node.
-    value_sum : float
-        The sum of values backpropagated through this node.
+    value_best: float
+        The best of values backpropagated through this node.
 
     Methods
     -------
@@ -41,8 +41,6 @@ class Node:
         Selects the child node with the highest UCB value.
     get_ucb(child):
         Calculates the UCB value for a child node.
-    get_ucb_alphazero(child):
-        Calculates the UCB value for a child node using the AlphaZero method.
     expand(mdp):
         Expands the node by adding a child node.
     expand_alphazero(policy, mdp):
@@ -71,7 +69,7 @@ class Node:
         self.expandable_actions = mdp.get_valid_actions(state)
 
         self.visit_count = visit_count
-        self.value_sum = 0
+        self.value_best = 0
 
         self.prior = prior
 
@@ -88,7 +86,7 @@ class Node:
         """
         return len(self.children) > 0
 
-    def select(self, ucb_method='alphazero'):
+    def select(self):
         """
         Calculate ucb for all children.
         Selects the child node with the highest UCB value.
@@ -107,10 +105,7 @@ class Node:
         best_ucb = -np.inf
 
         for child in self.children:
-            if ucb_method == 'alphazero':
-                ucb = self.get_ucb_alphazero(child)
-            else:
-                ucb = self.get_ucb(child)
+            ucb = self.get_ucb(child)
             if ucb > best_ucb:
                 best_child = child
                 best_ucb = ucb
@@ -118,24 +113,6 @@ class Node:
         return best_child
 
     def get_ucb(self, child):
-        """
-        Calculates the UCB value for a child node.
-        Exploration vs Exploitation constant is self.args['C']
-
-        Parameters
-        ----------
-        child : Node
-            The child node.
-
-        Returns
-        -------
-        float
-            The UCB value for the child node.
-        """
-        q_value = ((child.value_sum / child.visit_count) + 1) / 2
-        return q_value + self.args['C'] * np.sqrt(np.log(self.visit_count)/child.visit_count)
-
-    def get_ucb_alphazero(self, child):
         """
         Calculates the UCB value for a child node using the AlphaZero method.
         Exploration vs Exploitation constant is self.args['C']
@@ -150,36 +127,12 @@ class Node:
         float
             The UCB value for the child node using the AlphaZero method.
         """
-        q_value = child.value_sum / (child.visit_count + 1)
-        return q_value + self.args['C'] * np.sqrt(self.visit_count)/(child.visit_count + 1) * child.prior
+        q_value = child.value_best
+        u_value = np.sqrt(self.visit_count)/(child.visit_count + 1) * child.prior
 
-    def expand(self, mdp):
-        """
-        Expands the node by adding a child node.
+        return q_value + self.args['C'] * u_value
 
-        Parameters
-        ----------
-        mdp : object
-            The mdp object.
-
-        Returns
-        -------
-        Node
-            The newly added child node.
-        """
-        action_index = np.random.choice(range(len(self.expandable_actions)))
-        action = self.expandable_actions[action_index]
-
-        self.expandable_actions.pop(action_index)
-
-        child_state = self.state.copy()
-        child_state = mdp.get_next_state(child_state, action)
-
-        child = Node(mdp, self.args, child_state, self, action)
-        self.children.append(child)
-        return child
-
-    def expand_alphazero(self, policy, mdp):
+    def expand(self, policy, mdp):
         """
         Expands the node using the AlphaZero policy.
 
@@ -236,8 +189,11 @@ class Node:
         value : float
             The value to backpropagate.
         """
-        self.value_sum += value
         self.visit_count += 1
+
+        if self.value_best < value:
+            self.value_best = value
+
         if self.parent is not None:
             self.parent.backpropagete(value)
 
@@ -288,14 +244,15 @@ class MCTS:
             self.mdp.encode_state(root.state),
             self.mdp.data.edge_index,
         )
-        policy = torch.softmax(policy.squeeze(0), dim=0).detach().cpu().numpy()
+        policy = torch.softmax(policy.squeeze(0), dim=0).detach().cpu()
 
 #         dirichlet random noise
 #        policy = (1-self.args['eps']) * policy \
 #            + self.args['eps'] * np.random.dirichlet([self.args['dirichlet_alpha']]*len(self.mdp.edges))
+
         policy = self.mdp.mask_policy(policy, root.state)
 
-        root.expand_alphazero(policy, self.mdp)
+        root.expand(policy, self.mdp)
 
         for s in range(self.args['num_searches']-len(state)):
             node = root
@@ -315,7 +272,7 @@ class MCTS:
 
                 value = value.item()
 
-                node.expand_alphazero(policy, self.mdp)
+                node.expand(policy, self.mdp)
 
 
             node.backpropagete(value)
@@ -389,7 +346,7 @@ class MCTSParallel:
             Data(x=self.mdp.encode_state(s), edge_index=self.mdp.data.edge_index)\
             for s in states
         ]
-        batch = Batch.from_data_list(data_list)
+        batch = Batch.from_data_list(data_list).to(self.mdp.device)
         _, policy = self.model.forward(batch.x, batch.edge_index, batch.batch)
         policy = policy.view(batch.batch_size, -1)
         del batch
@@ -409,7 +366,7 @@ class MCTSParallel:
             p_policy = self.mdp.mask_policy(p_policy, states[i])
 
             mem.root = Node(self.mdp, self.args, states[i], visit_count=1)
-            mem.root.expand_alphazero(p_policy, self.mdp)
+            mem.root.expand(p_policy, self.mdp)
 
         for _ in range(self.args['num_searches']-len(states[0])+1):
             for mem in p_memory:
@@ -428,7 +385,6 @@ class MCTSParallel:
             expandable = [i for i in range(len(p_memory)) if p_memory[i].node != None]
 
             if len(expandable) > 0:
-                value, policy = [], []
                 data_list = [
                     Data(
                         x=self.mdp.encode_state(p_memory[i].node.state),
@@ -436,21 +392,23 @@ class MCTSParallel:
                     )\
                     for i in expandable
                 ]
-                batch = Batch.from_data_list(data_list)
+                batch = Batch.from_data_list(data_list).to(self.mdp.device)
                 value, policy = self.model.forward(
                     batch.x,
                     batch.edge_index,
                     batch.batch
                 )
-                policy = policy.view(batch.batch_size, -1)
+                policy = policy.view(batch.batch_size, -1).detach().cpu()
                 policy = torch.softmax(policy, dim=1)
+                del data_list
+                del batch
 
             for i, idx in enumerate(expandable):
                 node = p_memory[idx].node
                 p_value, p_policy = value[i], policy[i]
                 p_policy = self.mdp.mask_policy(p_policy, node.state)
 
-                node.expand_alphazero(p_policy, self.mdp)
+                node.expand(p_policy, self.mdp)
                 node.backpropagete(p_value)
 
 

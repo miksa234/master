@@ -174,11 +174,12 @@ class MDP:
         terminated = False
 
         if len(valid_actions) == 0:
-            return -1, True
+            value = -1
+            terminated = True
 
         if len(state) >= self.args['cutoff']:
             value += -len(state)/(len(self.edges)//2)
-            terminated = True
+            return value, True
 
         if self.check_win(state):
             profit = np.log(self.calculate_profit(state))

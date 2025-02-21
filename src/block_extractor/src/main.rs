@@ -60,7 +60,7 @@ async fn main() -> Result<()> {
 //    ).await.unwrap();
 //
     let filtered_pools = load_pools_from_file(
-        Path::new("../data/pools/pools_deg_5_liq_100_block_18.csv"),
+        Path::new("../data/pools/pools_deg_5_liq_100_block_20.csv"),
     ).unwrap();
 
     let tokens = load_tokens_from_file(

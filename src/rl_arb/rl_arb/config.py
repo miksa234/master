@@ -13,8 +13,8 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 ARGS_GAME = {
     'tau': 1,
-    'M': 100,
-    'cutoff': 15
+    'M': 1,
+    'cutoff': 20
 }
 
 ARGS_MODEL = {
@@ -28,20 +28,20 @@ ARGS_MODEL = {
 }
 
 ARGS_TRAINING = {
-    'C': 1,
-    'C_1/3' : 3.5,
-    'C_2/3' : 2.0,
-    'C_3/3' : 1.5,
+    'C': 2,
+    'C_1/3' : 5,
+    'C_2/3' : 2.5,
+    'C_3/3' : 1,
     'num_iterations': 50,
-    'num_searches': 20,
-    'num_self_play_iterations': 8000,
+    'num_searches': 50,
+    'num_self_play_iterations': 4000,
     'num_parallel': 100,
-    'num_epochs': 10,
-    'batch_size': 256,
+    'num_epochs': 20,
+    'batch_size': 64,
     'temperature': 1,
     'eps': 0.25,
     'dirichlet_alpha': 0.3,
-    'num_processes': 80,
+    'num_processes': 20,
     'multicore': True,
     'telegram': True,
 }

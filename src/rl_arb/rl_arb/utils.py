@@ -159,8 +159,10 @@ def linear_node_relabel(G):
         - mapping (dict): Mapping dictionary.
     """
     mapping = {}
+    inv_mapping = {}
     for i, node in enumerate(list(G.nodes())):
         mapping[node] = i
+        inv_mapping[i] = node
     G = nx.relabel_nodes(G, mapping)
     return G, mapping
 

@@ -24,7 +24,7 @@ from rl_arb.utils import (
 
 
 class AgentRLearn():
-    def __init__(self, model, optimizer, mdp: MDP, args):
+    def __init__(self, model, mdp, args):
         """
         RL algorithm class for training and self-play using Monte Carlo Tree
         Search (MCTS).
@@ -33,8 +33,6 @@ class AgentRLearn():
         ----------
         model : torch.nn.Module
             The neural network model used for policy and value prediction.
-        optimizer : torch.optim.Optimizer
-            The optimizer used for training the model.
         mdp : MDP
             The MDP environment that provides the logic and state transitions.
         args : dict
@@ -50,15 +48,12 @@ class AgentRLearn():
             Main loop for the learning process, including self_play and training.
         """
         self.model = model
-        self.optimizer = optimizer
-        self.mdp = mdp
         self.args = args
-        self.mcts = MCTSParallel(self.mdp, self.args, self.model)
+        self.mcts = MCTSParallel(mdp, self.args, self.model)
 
         self.loss = []
         self.avg_state_len = []
         self.pbar_play = False
-
 
     def self_play(self):
         """
@@ -71,9 +66,9 @@ class AgentRLearn():
             value estimates, and block indices.
         """
         return_mem = []
-        at_block = np.random.choice(self.mdp.num_blocks)
-        self.mdp.current_block = at_block
-        p_memory = [PMemory(self.mdp, at_block) for _ in range(self.args['num_parallel'])]
+        at_block = np.random.choice(self.mcts.mdp.num_blocks)
+        self.mcts.mdp.current_block = at_block
+        p_memory = [PMemory(self.mcts.mdp, at_block) for _ in range(self.args['num_parallel'])]
 
 
         if self.pbar_play:
@@ -93,10 +88,10 @@ class AgentRLearn():
 
             for i in range(len(p_memory))[::-1]:
                 mem = p_memory[i]
-                probs = np.zeros(len(self.mdp.edge_list))
+                probs = np.zeros(len(self.mcts.mdp.edge_list))
                 for child in mem.root.children:
                     probs[
-                        self.mdp.edge_list.index(child.action_taken)
+                        self.mcts.mdp.edge_list.index(child.action_taken)
                     ] = child.visit_count
                 probs /= np.sum(probs)
 
@@ -105,18 +100,15 @@ class AgentRLearn():
                     probs
                 ))
 
-                temp_probs = probs ** (1 / self.args['temperature'])
-                temp_probs /= temp_probs.sum()
-
                 action_idx = np.random.choice(
-                    list(range(len(self.mdp.edge_list))),
-                    p=temp_probs
+                    list(range(len(self.mcts.mdp.edge_list))),
+                    p=probs
                 )
-                action = self.mdp.edge_list[action_idx]
+                action = self.mcts.mdp.edge_list[action_idx]
 
-                mem.state = self.mdp.get_next_state(mem.state, action)
-                value, is_terminal = self.mdp.get_value_and_terminated(mem.state)
+                mem.state = self.mcts.mdp.get_next_state(mem.state, action)
 
+                value, is_terminal = self.mcts.mdp.get_value_and_terminated(mem.state)
                 if is_terminal:
                     if self.pbar_play:
                         pbar.update(1)
@@ -131,8 +123,7 @@ class AgentRLearn():
 
         return return_mem
 
-
-    def train(self, memory, iteration, epoch_iter):
+    def train(self, memory, optimizer, iteration, epoch_iter):
         """
         Trains the model using the provided memory of mdp states and outcomes.
 
@@ -163,12 +154,12 @@ class AgentRLearn():
 
             data_list = [
                 Data(
-                    x=self.mdp.encode_state(s),
-                    edge_index=self.mdp.data.edge_index
+                    x=self.mcts.mdp.encode_state(s),
+                    edge_index=self.mcts.mdp.data.edge_index
                  )\
                 for s in states
             ]
-            batch = Batch.from_data_list(data_list)
+            batch = Batch.from_data_list(data_list).to(DEVICE)
             value_outs, policy_outs = self.model.forward(
                 batch.x,
                 batch.edge_index,
@@ -180,7 +171,7 @@ class AgentRLearn():
 
             policy_loss = F.cross_entropy(policy_outs, policy_targets)
             value_loss = F.mse_loss(value_outs, value_targets)
-            loss = policy_loss + value_loss
+            loss = policy_loss * value_loss
 
             self.loss.append([policy_loss.item(), value_loss.item()])
             epoch_policy_loss.append(policy_loss.item())
@@ -189,9 +180,9 @@ class AgentRLearn():
                 np.mean(np.array([len(s) for s in states]))
             )
 
-            self.optimizer.zero_grad()
+            optimizer.zero_grad()
             loss.backward()
-            self.optimizer.step()
+            optimizer.step()
 
         if self.args['telegram']:
             update_me(
@@ -218,8 +209,28 @@ class AgentRLearn():
         if iteration <= self.args['num_iterations']//3:
             self.mcts.set_C(self.args['C_1/3'])
 
+    def adapt_learning_rate(self, optimizer, iter, max_iter):
+        """
+        Adapts the learning rate of the optimzer.
 
-    def learn(self):
+        Parameters
+        ----------
+        iter: int
+            The current iteration number.
+        max_iter: int
+            Maximum iteration number.
+        """
+        if iter < max_iter * 1/3:
+            lr = 0.01
+        if max_iter * 1/3 <= iter and iter < max_iter * 2/3:
+            lr = 0.001
+        if max_iter * 2/3 <= iter and iter < max_iter:
+            lr = 0.0001
+
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
+
+    def learn(self, optimizer):
         """
         Main loop for the learning process, including self-play and training.
         """
@@ -227,17 +238,15 @@ class AgentRLearn():
             logger.info(f"Iterations: {iteration+1}/{self.args['num_iterations']}")
             if self.args['telegram']:
                 send_telegram_message(f"Iterations: {iteration+1}/{self.args['num_iterations']}")
-
             self.adapt_exploration_parameter(iteration)
-
+            self.adapt_learning_rate(optimizer, iteration, self.args['num_iterations'])
 
             memory = []
             self.model.eval()
             if not self.args['multicore']:
                 # single core self-play
                 self.model.to(DEVICE)
-                self.mdp.data.to(DEVICE)
-                self.mdp.device = DEVICE
+                self.mcts.mdp.device = DEVICE
                 for play_iter in tqdm(
                     range(self.args['num_self_play_iterations']//self.args['num_parallel']),
                     desc="self play",
@@ -250,8 +259,7 @@ class AgentRLearn():
             else:
                 cpu = torch.device('cpu')
                 self.model.to(cpu)
-                self.mdp.data.to(cpu)
-                self.mdp.device = cpu
+                self.mcts.mdp.device = cpu
                 # multicore self-play
                 play_iter = self.args['num_self_play_iterations']
                 num_parallel = self.args['num_parallel']
@@ -269,8 +277,7 @@ class AgentRLearn():
                     pool.terminate()
 
                 self.model.to(DEVICE)
-                self.mdp.data.to(DEVICE)
-                self.mdp.device = DEVICE
+                self.mcts.mdp.device = DEVICE
 
                 for result in results:
                     memory += result
@@ -283,10 +290,10 @@ class AgentRLearn():
                 chat_id=TELEGRAM_CHAT_ID,
                 disable=not self.args['telegram']
             ):
-                self.train(memory, iteration, epoch_iter)
+                self.train(memory, optimizer, iteration, epoch_iter)
 
             torch.save(self.model.state_dict(), f"./model/model_{iteration}.pt")
-            torch.save(self.optimizer.state_dict(), f"./model/optimizer_{iteration}.pt")
+            torch.save(optimizer.state_dict(), f"./model/optimizer_{iteration}.pt")
 
         save_loss(self.loss, self.avg_state_len)
         if self.args['telegram']:
@@ -314,8 +321,7 @@ def self_play_num_times(rlearn, times=100, device='cpu', pbar=False):
 
     rlearn.pbar_play = pbar
     rlearn.model.to(device)
-    rlearn.mdp.data.to(device)
-    rlearn.mdp.device = device
+    rlearn.mcts.mdp.device = device
     for _ in range(times):
         memory += rlearn.self_play()
     return memory
