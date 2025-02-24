@@ -112,9 +112,24 @@ class Initializer():
 
         model = Net(
             ARGS_MODEL
-        ).share_memory()
+        ).share_memory().to(DEVICE)
 
+#        model.load_state_dict(
+#            torch.load(
+#                "./model/model_3.pt",
+#                weights_only = True,
+#                map_location=DEVICE
+#            )
+#        )
+#
         optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+#        optimizer.load_state_dict(
+#            torch.load(
+#                "./model/optimizer_3.pt",
+#                weights_only = True,
+#                map_location=DEVICE
+#            )
+#        )
         optimizer.zero_grad()
 
         mcts = MCTS(mdp, ARGS_TRAINING, model)

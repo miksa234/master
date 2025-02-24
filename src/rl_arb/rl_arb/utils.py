@@ -243,7 +243,7 @@ def update_me(
         ITR: {iteration+1} | EPOCH: {epoch_iter}
         Policy loss: {policy_loss}
         Value loss: {value_loss}
-        Total loss: {policy_loss + value_loss}
+        Total loss: {policy_loss * value_loss}
         Average state length: {avg_state_len}
     """
     send_telegram_message(message)

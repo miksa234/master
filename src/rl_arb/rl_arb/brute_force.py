@@ -5,6 +5,7 @@ import torch
 import time
 import sys
 from torch_geometric.data import Data, Batch
+from torch_geometric.nn import summary
 sys.setrecursionlimit(1000000)
 
 from rl_arb.initializer import Initializer
@@ -32,11 +33,12 @@ def brute_force_search_trail(mdp, source, cap):
     dfs(state)
     profits = [0]
     for trail in trails:
-        profits.append(mdp.calculate_profit(trail))
+        profits.append(mdp.calculate_profit(trail, mdp.current_block))
 
     return trails, profits
 
 
+@torch.no_grad()
 def test_model():
     problem = Initializer()
 
@@ -44,13 +46,6 @@ def test_model():
     problem.mdp.device = DEVICE
     problem.model.to(DEVICE)
 
-    problem.model.load_state_dict(
-        torch.load(
-            "./model/model_28.pt",
-            weights_only = True,
-            map_location=DEVICE
-        )
-    )
     problem.model.eval()
 
     np.random.seed(0)
@@ -65,8 +60,6 @@ def test_model():
         if len(t) > 0:
             logger.info(f"Max state {t[p.index(max_p)-1]}")
 
-
-
         while True:
             probs = problem.mcts.search(state)
 
@@ -77,11 +70,11 @@ def test_model():
             action = problem.mdp.edge_list[action_idx]
             state = problem.mdp.get_next_state(state, action)
 
-            value, is_terminal = problem.mdp.get_value_and_terminated(state)
+            value, is_terminal = problem.mdp.get_value_and_terminated(state, problem.mdp.current_block)
 
             if is_terminal:
                 if problem.mdp.check_win(state):
-                    profit = problem.mdp.calculate_profit(state)
+                    profit = problem.mdp.calculate_profit(state, problem.mdp.current_block)
                     if profit < 1:
                         logger.info(f'LOSS {state} with profit {profit}, {value}')
                     else:
@@ -89,4 +82,19 @@ def test_model():
                 else:
                     logger.info(f'LOSS {state} NO valid actions, {value}')
                 break
+
+
+def print_summary():
+
+    problem = Initializer()
+
+    problem.mdp.data.to(DEVICE)
+    problem.mdp.device = DEVICE
+    problem.model.to(DEVICE)
+
+    state = [(1, 1, 0), (1, 2, 0)]
+    e_x = problem.mdp.encode_state(state).to(DEVICE)
+    edge_index = problem.mdp.data.edge_index
+
+    print(summary(model, e_x, edge_index))
 

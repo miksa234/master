@@ -3,6 +3,8 @@
 import numpy as np
 import torch
 from torch_geometric.data import Batch, Data
+import time
+import matplotlib.pyplot as plt
 
 import logging
 
@@ -151,34 +153,6 @@ class Node:
                 child = Node(mdp, self.args, child_state, self, mdp.edge_list[action], prob)
                 self.children.append(child)
 
-    def simulate(self, mdp):
-        """
-        Simulates a rollout from the current state.
-
-        Parameters
-        ----------
-        mdp : object
-            The mdp object.
-
-        Returns
-        -------
-        float
-            The value of the terminal state reached by the rollout.
-        """
-        value, is_terminal = mdp.get_value_and_terminated(self.state)
-        if is_terminal:
-            return value
-
-        rollout_state = self.state.copy()
-        while True:
-            valid_actions = mdp.get_valid_actions(rollout_state)
-            action_index = np.random.choice(range(len(valid_actions)))
-            action = valid_actions[action_index]
-
-            rollout_state = mdp.get_next_state(rollout_state, action)
-            value, is_terminal = mdp.get_value_and_terminated(rollout_state)
-            if is_terminal:
-                return value
 
     def backpropagete(self, value):
         """
@@ -241,14 +215,10 @@ class MCTS:
         root = Node(self.mdp, self.args, state, visit_count=1)
 
         _, policy = self.model(
-            self.mdp.encode_state(root.state),
+            self.mdp.encode_state(root.state, self.mdp.current_block),
             self.mdp.data.edge_index,
         )
         policy = torch.softmax(policy.squeeze(0), dim=0).detach().cpu()
-
-#         dirichlet random noise
-#        policy = (1-self.args['eps']) * policy \
-#            + self.args['eps'] * np.random.dirichlet([self.args['dirichlet_alpha']]*len(self.mdp.edges))
 
         policy = self.mdp.mask_policy(policy, root.state)
 
@@ -260,11 +230,14 @@ class MCTS:
                 node = node.select()
 
 
-            value, is_terminal = self.mdp.get_value_and_terminated(node.state)
+            value, is_terminal = self.mdp.get_value_and_terminated(
+                node.state,
+                self.mdp.current_block
+            )
 
             if not is_terminal:
                 value, policy = self.model(
-                    self.mdp.encode_state(root.state),
+                    self.mdp.encode_state(root.state, self.mdp.current_block),
                     self.mdp.data.edge_index
                 )
                 policy = torch.softmax(policy.squeeze(0), dim=0)
@@ -286,6 +259,12 @@ class MCTS:
             ] = child.visit_count
 
         action_probs /= np.sum(action_probs)
+        action_probs = action_probs ** (1 / self.args['temperature'])
+        action_probs /= np.sum(action_probs)
+
+        plt.plot(action_probs)
+        plt.savefig(f"{state}.png")
+        plt.close()
         return action_probs
 
 
@@ -310,10 +289,9 @@ class MCTSParallel:
     search(states, p_memory):
         Performs the parallel MCTS search from the given states.
     """
-    def __init__(self, mdp, args, model):
+    def __init__(self, mdp, args):
         self.mdp = mdp
         self.args = args
-        self.model = model
 
     def set_C(self, C):
         """
@@ -329,7 +307,7 @@ class MCTSParallel:
         self.args['C'] = C
 
     @torch.no_grad()
-    def search(self, states, p_memory):
+    def search(self, model, states, p_memory):
         """
         Performs the parallel MCTS search from the given states.
 
@@ -343,16 +321,21 @@ class MCTSParallel:
 
         # batch data
         data_list = [
-            Data(x=self.mdp.encode_state(s), edge_index=self.mdp.data.edge_index)\
+            Data(
+                x=self.mdp.encode_state(s, self.mdp.current_block),
+                edge_index=self.mdp.data.edge_index
+            )\
             for s in states
         ]
+
         batch = Batch.from_data_list(data_list).to(self.mdp.device)
-        _, policy = self.model.forward(batch.x, batch.edge_index, batch.batch)
+        _, policy = model.forward(batch.x, batch.edge_index, batch.batch)
         policy = policy.view(batch.batch_size, -1)
+
         del batch
         del data_list
-        policy = torch.softmax(policy, dim=1).detach().cpu().numpy()
 
+        policy = torch.softmax(policy, dim=1).detach().cpu().numpy()
         # dirichlet random noise
         policy = (1-self.args['eps']) * policy \
             + self.args['eps'] \
@@ -375,7 +358,10 @@ class MCTSParallel:
                 while node.is_fully_expanded():
                     node = node.select()
 
-                value, is_terminal = self.mdp.get_value_and_terminated(node.state)
+                value, is_terminal = self.mdp.get_value_and_terminated(
+                    node.state,
+                    self.mdp.current_block
+                )
 
                 if is_terminal:
                     node.backpropagete(value)
@@ -385,23 +371,36 @@ class MCTSParallel:
             expandable = [i for i in range(len(p_memory)) if p_memory[i].node != None]
 
             if len(expandable) > 0:
-                data_list = [
-                    Data(
-                        x=self.mdp.encode_state(p_memory[i].node.state),
-                        edge_index=self.mdp.data.edge_index
-                    )\
-                    for i in expandable
-                ]
-                batch = Batch.from_data_list(data_list).to(self.mdp.device)
-                value, policy = self.model.forward(
-                    batch.x,
-                    batch.edge_index,
-                    batch.batch
-                )
-                policy = policy.view(batch.batch_size, -1).detach().cpu()
-                policy = torch.softmax(policy, dim=1)
-                del data_list
-                del batch
+                chunks = [expandable[i:i+self.args['num_parallel']] for i in range(0, len(expandable), self.args['num_parallel'])]
+                value, policy = [], []
+                for chunk in chunks:
+                    data_list = [
+                        Data(
+                            x=self.mdp.encode_state(
+                                p_memory[i].node.state,
+                                self.mdp.current_block
+                            ),
+                            edge_index=self.mdp.data.edge_index
+                        )\
+                        for i in chunk
+                    ]
+
+                    batch = Batch.from_data_list(data_list).to(self.mdp.device)
+                    value_chunk, policy_chunk = model.forward(
+                        batch.x,
+                        batch.edge_index,
+                        batch.batch
+                    )
+                    policy_chunk = policy_chunk.view(batch.batch_size, -1).detach().cpu()
+                    policy_chunk = torch.softmax(policy_chunk, dim=1)
+                    policy.append(policy_chunk)
+                    value.append(value_chunk)
+
+                    del batch
+                    del data_list
+                value = torch.cat(value, 0)
+                policy = torch.cat(policy, 0)
+
 
             for i, idx in enumerate(expandable):
                 node = p_memory[idx].node

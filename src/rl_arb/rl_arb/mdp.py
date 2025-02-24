@@ -154,7 +154,7 @@ class MDP:
         """
         return state[0][1] == state[-1][1] and len(state) > 1
 
-    def get_value_and_terminated(self, state):
+    def get_value_and_terminated(self, state, at_block):
         """
         Returns the value and whether the state is terminal.
 
@@ -173,24 +173,30 @@ class MDP:
         value = 0
         terminated = False
 
+
+        if len(state) >= self.args['cutoff']:
+            value += -len(state)/(len(self.edges)//2)
+            terminated = True
+
+        if self.check_win(state):
+            profit = np.log(self.calculate_profit(state, at_block))
+            value += 0.5 + profit
+
+            if value < -1:
+                value = -1
+            if value > 1:
+                value = 1
+
+            terminated = True
+            return value, terminated
+
         if len(valid_actions) == 0:
             value = -1
             terminated = True
 
-        if len(state) >= self.args['cutoff']:
-            value += -len(state)/(len(self.edges)//2)
-            return value, True
-
-        if self.check_win(state):
-            profit = np.log(self.calculate_profit(state))
-            if profit > 0:
-                profit *= self.args['M']
-            value += 1 + profit
-            terminated = True
-
         return value, terminated
 
-    def encode_state(self, state):
+    def encode_state(self, state, at_block):
         """
         Encodes the current state into a tensor.
 
@@ -206,24 +212,33 @@ class MDP:
         """
         e_x = self.data.x.detach().clone()
         e_x= torch.dstack([
-            e_x[:, self.current_block],       # exchange rate
-            e_x[:, self.num_blocks-1+1],      # used binary
-            e_x[:, self.num_blocks-1+2],      # t0 binary
-            e_x[:, self.num_blocks-1+3],      # t1 binary
+            e_x[:, at_block],       # exchange rate
+            e_x[:, self.num_blocks+1],      # used binary
+            e_x[:, self.num_blocks+2],      # t0 binary
+            e_x[:, self.num_blocks+3],      # t1 binary
         ]).squeeze(0)
 
         # encode the current t0 or t1
         line_mapping_keys = list(self.line_mapping.keys())
-        current_node = state[-1][1]
+        start_node = state[0][1]
+        current_node= state[-1][1]
 
         if len(state) > 1:
             if state[-1] in line_mapping_keys:
-                line_state = state[-1]
+                line_state_current = state[-1]
             else:
-                line_state = (state[-1][1], state[-1][0], state[-1][2])
+                line_state_current = (state[-1][1], state[-1][0], state[-1][2])
 
-            e_x[self.line_mapping[line_state],
-                line_state[:2].index(current_node)+2] = 1
+            e_x[self.line_mapping[line_state_current],
+                line_state_current[:2].index(current_node)+2] = 1
+
+            if state[1] in line_mapping_keys:
+                line_state_start = state[1]
+            else:
+                line_state_start = (state[1][1], state[1][0], state[1][2])
+
+            e_x[self.line_mapping[line_state_start],
+                line_state_start[:2].index(start_node)+2] = 1
 
             # encode the used edges
             edge_idx = []
@@ -233,6 +248,7 @@ class MDP:
                 if (e[1], e[0], e[2]) in line_mapping_keys:
                     edge_idx.append(self.line_mapping[(e[1], e[0], e[2])])
             e_x[edge_idx, 1] = 1
+            e_x[edge_idx, 0] = 0
 
         return e_x.to(self.device)
 
@@ -263,7 +279,7 @@ class MDP:
         masked_policy = policy * mask
         return masked_policy / masked_policy.sum()
 
-    def calculate_profit(self, state):
+    def calculate_profit(self, state, at_block):
        return np.prod(
-            [self.edges[edge][self.current_block] for edge in state[1:]]
+            [self.edges[edge][at_block] for edge in state[1:]]
         )

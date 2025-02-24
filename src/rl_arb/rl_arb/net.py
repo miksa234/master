@@ -68,16 +68,17 @@ class Net(nn.Module):
             Linear(args['emb_channels']*args['policy_mheads'], 2),
         ])
 
-        self.value_head = Sequential('x, edge_index', [
+        self.value_head = Sequential('x, edge_index, batch', [
             (GATv2Conv(
                 args['emb_channels'],
                 args['emb_channels'],
                 heads=args['value_mheads']
             ), 'x, edge_index -> x'),
-            BatchNorm(args['emb_channels']*args['value_mheads']),
+            BatchNorm(args['emb_channels']*args['policy_mheads']),
+            nn.ReLU(),
+            Linear(args['emb_channels']*args['value_mheads'], args['emb_channels']*args['value_mheads']),
             nn.ReLU(),
             Linear(args['emb_channels']*args['value_mheads'], 1),
-            nn.Tanh(),
         ])
 
 
@@ -102,7 +103,7 @@ class Net(nn.Module):
             x = block(x, edge_index)
 
         policy = self.policy_head(x, edge_index).flatten().unsqueeze(0)
-        value = global_mean_pool(self.value_head(x, edge_index), batch)
+        value = global_mean_pool(torch.tanh(self.value_head(x, edge_index)), batch)
 
         return value, policy
 

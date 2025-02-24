@@ -8,13 +8,17 @@ import torch.multiprocessing as mp
 from tqdm.contrib.telegram import tqdm
 import logging
 logger = logging.getLogger('rl_circuit')
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch import distributed as dist
+import os
 
-from rl_arb.mdp import MDP
+from rl_arb.net import Net
 from rl_arb.mcts import MCTSParallel, PMemory
 from rl_arb.config import (
     DEVICE,
     TELEGRAM_TOKEN,
     TELEGRAM_CHAT_ID,
+    ARGS_MODEL,
 )
 from rl_arb.utils import (
         update_me,
@@ -49,10 +53,8 @@ class AgentRLearn():
         """
         self.model = model
         self.args = args
-        self.mcts = MCTSParallel(mdp, self.args, self.model)
+        self.mcts = MCTSParallel(mdp, self.args)
 
-        self.loss = []
-        self.avg_state_len = []
         self.pbar_play = False
 
     def self_play(self):
@@ -84,7 +86,7 @@ class AgentRLearn():
             if self.pbar_play:
                 pbar.set_description(f"self_play state_len {len(states[0])}")
 
-            self.mcts.search(states, p_memory)
+            self.mcts.search(self.model, states, p_memory)
 
             for i in range(len(p_memory))[::-1]:
                 mem = p_memory[i]
@@ -93,6 +95,7 @@ class AgentRLearn():
                     probs[
                         self.mcts.mdp.edge_list.index(child.action_taken)
                     ] = child.visit_count
+
                 probs /= np.sum(probs)
 
                 mem.memory.append((
@@ -108,7 +111,8 @@ class AgentRLearn():
 
                 mem.state = self.mcts.mdp.get_next_state(mem.state, action)
 
-                value, is_terminal = self.mcts.mdp.get_value_and_terminated(mem.state)
+                value, is_terminal = self.mcts.mdp.get_value_and_terminated(mem.state, mem.current_block)
+
                 if is_terminal:
                     if self.pbar_play:
                         pbar.update(1)
@@ -123,73 +127,6 @@ class AgentRLearn():
 
         return return_mem
 
-    def train(self, memory, optimizer, iteration, epoch_iter):
-        """
-        Trains the model using the provided memory of mdp states and outcomes.
-
-        Parameters
-        ----------
-        memory : list
-            A list of tuples containing mdp states, policy probabilities,
-            value estimates, and block indices.
-        """
-        epoch_policy_loss = []
-        epoch_value_loss = []
-        np.random.shuffle(memory)
-        for batch_idx in range(0, len(memory), self.args['batch_size']):
-            sample = memory[batch_idx:np.min([len(memory) - 1, batch_idx + self.args['batch_size']])]
-            try:
-                states , policy_targets, value_targets, block_indices = zip(*sample)
-            except ValueError: # batch is len 0.
-                print(f"batch_idx {batch_idx}")
-                print(f"From-TO : {[batch_idx, np.min([len(memory) - 1, batch_idx + self.args['batch_size']])]}")
-                print(f"len memory {len(memory)}")
-                print(f"len sample {len(sample)}")
-                continue
-
-            policy_targets, value_targets = np.array(policy_targets), np.array(value_targets)
-            policy_targets = torch.tensor(policy_targets).to(DEVICE).float()
-            value_targets = torch.tensor(value_targets).to(DEVICE).float().unsqueeze(1)
-
-
-            data_list = [
-                Data(
-                    x=self.mcts.mdp.encode_state(s),
-                    edge_index=self.mcts.mdp.data.edge_index
-                 )\
-                for s in states
-            ]
-            batch = Batch.from_data_list(data_list).to(DEVICE)
-            value_outs, policy_outs = self.model.forward(
-                batch.x,
-                batch.edge_index,
-                batch.batch
-            )
-            policy_outs = policy_outs.view(batch.batch_size, -1)
-            del batch
-            del data_list
-
-            policy_loss = F.cross_entropy(policy_outs, policy_targets)
-            value_loss = F.mse_loss(value_outs, value_targets)
-            loss = policy_loss * value_loss
-
-            self.loss.append([policy_loss.item(), value_loss.item()])
-            epoch_policy_loss.append(policy_loss.item())
-            epoch_value_loss.append(value_loss.item())
-            self.avg_state_len.append(
-                np.mean(np.array([len(s) for s in states]))
-            )
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-        if self.args['telegram']:
-            update_me(
-                np.mean(epoch_policy_loss), np.mean(epoch_value_loss),
-                self.avg_state_len[-1],
-                epoch_iter, iteration
-            )
 
     def adapt_exploration_parameter(self, iteration):
         """
@@ -209,37 +146,16 @@ class AgentRLearn():
         if iteration <= self.args['num_iterations']//3:
             self.mcts.set_C(self.args['C_1/3'])
 
-    def adapt_learning_rate(self, optimizer, iter, max_iter):
-        """
-        Adapts the learning rate of the optimzer.
-
-        Parameters
-        ----------
-        iter: int
-            The current iteration number.
-        max_iter: int
-            Maximum iteration number.
-        """
-        if iter < max_iter * 1/3:
-            lr = 0.01
-        if max_iter * 1/3 <= iter and iter < max_iter * 2/3:
-            lr = 0.001
-        if max_iter * 2/3 <= iter and iter < max_iter:
-            lr = 0.0001
-
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = lr
 
     def learn(self, optimizer):
         """
         Main loop for the learning process, including self-play and training.
         """
-        for iteration in range(self.args['num_iterations']):
+        for iteration in range(4, self.args['num_iterations']):
             logger.info(f"Iterations: {iteration+1}/{self.args['num_iterations']}")
             if self.args['telegram']:
                 send_telegram_message(f"Iterations: {iteration+1}/{self.args['num_iterations']}")
             self.adapt_exploration_parameter(iteration)
-            self.adapt_learning_rate(optimizer, iteration, self.args['num_iterations'])
 
             memory = []
             self.model.eval()
@@ -259,6 +175,13 @@ class AgentRLearn():
             else:
                 cpu = torch.device('cpu')
                 self.model.to(cpu)
+                self.model.load_state_dict(
+                    torch.load(
+                        f"./model/model_{iteration-1}.pt",
+                        weights_only = True,
+                        map_location=cpu
+                    )
+                )
                 self.mcts.mdp.device = cpu
                 # multicore self-play
                 play_iter = self.args['num_self_play_iterations']
@@ -276,26 +199,16 @@ class AgentRLearn():
                     )
                     pool.terminate()
 
-                self.model.to(DEVICE)
-                self.mcts.mdp.device = DEVICE
-
                 for result in results:
                     memory += result
 
-            self.model.train()
-            for epoch_iter in tqdm(
-                range(self.args['num_epochs']),
-                desc="epochs",
-                token=TELEGRAM_TOKEN,
-                chat_id=TELEGRAM_CHAT_ID,
-                disable=not self.args['telegram']
-            ):
-                self.train(memory, optimizer, iteration, epoch_iter)
 
-            torch.save(self.model.state_dict(), f"./model/model_{iteration}.pt")
-            torch.save(optimizer.state_dict(), f"./model/optimizer_{iteration}.pt")
+            np.random.shuffle(memory)
+            world_size = torch.cuda.device_count()
+            mp.spawn(train, args=(world_size, memory, self.mcts, iteration), nprocs=world_size, join=True)
 
-        save_loss(self.loss, self.avg_state_len)
+
+
         if self.args['telegram']:
             send_telegram_message("DONE!")
 
@@ -325,3 +238,140 @@ def self_play_num_times(rlearn, times=100, device='cpu', pbar=False):
     for _ in range(times):
         memory += rlearn.self_play()
     return memory
+
+
+def train(rank, world_size, memory, mcts, iteration):
+    """
+    Distributed multi gpu training in pytorch.
+
+    Parameters
+    ----------
+    world_size: int
+        Number of cpus
+    memory : list
+        A list of containing mdp states, policy probabilities,
+        value estimates, and block indices.
+    mcts: MCTSParallel
+        Monte Carlo Tree search object.
+    iteration: int
+        Current search iteration
+    """
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+    dist.init_process_group('nccl', rank=rank, world_size=world_size)
+
+    dist.barrier()
+    map_location = {'cuda:%d' % 0: 'cuda:%d' % rank}
+    model = Net(ARGS_MODEL)
+    model.load_state_dict(
+        torch.load(
+            f"./model/model_{iteration-1}.pt",
+            weights_only = True,
+        )
+    )
+    model.to(rank)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    optimizer.load_state_dict(
+        torch.load(
+            f"./model/optimizer_{iteration-1}.pt",
+            weights_only = True,
+        )
+    )
+
+    model = DDP(model, device_ids=[rank])
+    adapt_learning_rate(optimizer, iteration, mcts.args['num_iterations'])
+
+    lm = len(memory)
+    memory = [memory[i: i+lm//world_size] for i in range(0, lm, lm//world_size)][rank]
+
+    epoch_policy_loss = []
+    epoch_value_loss = []
+    avg_state_len = []
+    for epoch_iter in tqdm(
+        range(mcts.args['num_epochs']),
+        desc="epochs",
+        token=TELEGRAM_TOKEN,
+        chat_id=TELEGRAM_CHAT_ID,
+        disable=(not mcts.args['telegram'] and rank != 0)
+    ):
+        np.random.shuffle(memory)
+        for batch_idx in range(0, len(memory), mcts.args['batch_size']):
+            sample = memory[batch_idx:np.min([len(memory) - 1, batch_idx + mcts.args['batch_size']])]
+            try:
+                states , policy_targets, value_targets, block_indices = zip(*sample)
+            except ValueError: # batch is len 0.
+                print(f"batch_idx {batch_idx}")
+                print(f"From-TO : {[batch_idx, np.min([len(memory) - 1, batch_idx + mcts.args['batch_size']])]}")
+                print(f"len memory {len(memory)}")
+                print(f"len sample {len(sample)}")
+                continue
+
+            policy_targets, value_targets = np.array(policy_targets), np.array(value_targets)
+            policy_targets = torch.tensor(policy_targets).to(rank).float()
+            value_targets = torch.tensor(value_targets).to(rank).float().unsqueeze(1)
+
+            data_list = [
+                Data(
+                    x=mcts.mdp.encode_state(s, b),
+                    edge_index=mcts.mdp.data.edge_index
+                 )\
+                for s, b  in zip(states, block_indices)
+            ]
+            batch = Batch.from_data_list(data_list).to(rank)
+            value_outs, policy_outs = model.forward(
+                batch.x,
+                batch.edge_index,
+                batch.batch
+            )
+            policy_outs = policy_outs.view(batch.batch_size, -1)
+            del batch
+            del data_list
+
+            policy_loss = F.cross_entropy(policy_outs, policy_targets)
+            value_loss = F.mse_loss(value_outs, value_targets)
+            loss = policy_loss * value_loss
+
+            epoch_policy_loss.append(policy_loss.item())
+            epoch_value_loss.append(value_loss.item())
+            avg_state_len.append(
+                np.mean(np.array([len(s) for s in states]))
+            )
+
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+
+        if mcts.args['telegram'] and rank == 0:
+            update_me(
+                np.mean(epoch_policy_loss), np.mean(epoch_value_loss),
+                np.mean(avg_state_len),
+                epoch_iter, iteration
+            )
+
+    if rank == 0:
+        torch.save(model.module.state_dict(), f"./model/model_{iteration}.pt")
+        torch.save(optimizer.state_dict(), f"./model/optimizer_{iteration}.pt")
+
+    dist.destroy_process_group()
+
+
+def adapt_learning_rate(optimizer, iter, max_iter):
+    """
+    Adapts the learning rate of the optimzer.
+
+    Parameters
+    ----------
+    iter: int
+        The current iteration number.
+    max_iter: int
+        Maximum iteration number.
+    """
+    if iter < max_iter * 1/3:
+        lr = 0.01
+    if max_iter * 1/3 <= iter and iter < max_iter * 2/3:
+        lr = 0.001
+    if max_iter * 2/3 <= iter and iter < max_iter:
+        lr = 0.0001
+
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
