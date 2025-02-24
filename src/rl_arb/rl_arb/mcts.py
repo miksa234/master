@@ -4,7 +4,6 @@ import numpy as np
 import torch
 from torch_geometric.data import Batch, Data
 import time
-import matplotlib.pyplot as plt
 
 import logging
 
@@ -257,14 +256,8 @@ class MCTS:
             action_probs[
                 self.mdp.edge_list.index(child.action_taken)
             ] = child.visit_count
-
-        action_probs /= np.sum(action_probs)
-        action_probs = action_probs ** (1 / self.args['temperature'])
         action_probs /= np.sum(action_probs)
 
-        plt.plot(action_probs)
-        plt.savefig(f"{state}.png")
-        plt.close()
         return action_probs
 
 

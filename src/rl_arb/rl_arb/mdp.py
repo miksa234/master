@@ -180,7 +180,8 @@ class MDP:
 
         if self.check_win(state):
             profit = np.log(self.calculate_profit(state, at_block))
-            value += 0.5 + profit
+            #value += 0.5 + profit
+            value+=profit*self.args['M']
 
             if value < -1:
                 value = -1
@@ -188,6 +189,7 @@ class MDP:
                 value = 1
 
             terminated = True
+            print(value)
             return value, terminated
 
         if len(valid_actions) == 0:

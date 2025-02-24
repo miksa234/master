@@ -45,7 +45,13 @@ def test_model():
     problem.mdp.data.to(DEVICE)
     problem.mdp.device = DEVICE
     problem.model.to(DEVICE)
-
+    problem.model.load_state_dict(
+        torch.load(
+            "./model/model_7.pt",
+            weights_only = True,
+            map_location=DEVICE
+        )
+    )
     problem.model.eval()
 
     np.random.seed(0)
