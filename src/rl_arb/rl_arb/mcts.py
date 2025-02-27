@@ -216,6 +216,7 @@ class MCTS:
         _, policy = self.model(
             self.mdp.encode_state(root.state, self.mdp.current_block),
             self.mdp.data.edge_index,
+            self.mdp.encode_state(root.state[:1], self.mdp.current_block)
         )
         policy = torch.softmax(policy.squeeze(0), dim=0).detach().cpu()
 
@@ -237,7 +238,8 @@ class MCTS:
             if not is_terminal:
                 value, policy = self.model(
                     self.mdp.encode_state(root.state, self.mdp.current_block),
-                    self.mdp.data.edge_index
+                    self.mdp.data.edge_index,
+                    y=self.mdp.encode_state(root.state[:1], self.mdp.current_block),
                 )
                 policy = torch.softmax(policy.squeeze(0), dim=0)
                 policy = self.mdp.mask_policy(policy, node.state)
@@ -316,13 +318,14 @@ class MCTSParallel:
         data_list = [
             Data(
                 x=self.mdp.encode_state(s, self.mdp.current_block),
-                edge_index=self.mdp.data.edge_index
+                edge_index=self.mdp.data.edge_index,
+                y=self.mdp.encode_state(s[:1], self.mdp.current_block),
             )\
             for s in states
         ]
 
         batch = Batch.from_data_list(data_list).to(self.mdp.device)
-        _, policy = model.forward(batch.x, batch.edge_index, batch.batch)
+        _, policy = model.forward(batch.x, batch.edge_index, batch.y, batch.batch)
         policy = policy.view(batch.batch_size, -1)
 
         del batch
@@ -373,7 +376,11 @@ class MCTSParallel:
                                 p_memory[i].node.state,
                                 self.mdp.current_block
                             ),
-                            edge_index=self.mdp.data.edge_index
+                            edge_index=self.mdp.data.edge_index,
+                            y=self.mdp.encode_state(
+                                p_memory[i].node.state[:1],
+                                self.mdp.current_block
+                            ),
                         )\
                         for i in chunk
                     ]
@@ -382,7 +389,8 @@ class MCTSParallel:
                     value_chunk, policy_chunk = model.forward(
                         batch.x,
                         batch.edge_index,
-                        batch.batch
+                        batch.y,
+                        batch.batch,
                     )
                     policy_chunk = policy_chunk.view(batch.batch_size, -1).detach().cpu()
                     policy_chunk = torch.softmax(policy_chunk, dim=1)
@@ -423,8 +431,8 @@ class PMemory:
         The current node in the search tree.
     """
     def __init__(self, mdp, at_block):
-        node = int(np.random.choice(mdp.nodes))
-        self.state = [(node, node, 0)]
+#        node = int(np.random.choice(mdp.nodes))
+        self.state = [(mdp.start_node, mdp.start_node, 0)]
         self.current_block = at_block
         self.memory = []
         self.root = None

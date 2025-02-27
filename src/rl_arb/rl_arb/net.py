@@ -3,7 +3,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch_geometric.nn import BatchNorm, GATv2Conv, Sequential, Linear
+from torch_geometric.nn import BatchNorm, GATConv, LayerNorm, Sequential, Linear
 
 import logging
 
@@ -57,32 +57,37 @@ class Net(nn.Module):
                 ResCovBlock(args)
             )
 
-        self.policy_head = Sequential('x, edge_index', [
-            (GATv2Conv(
-                args['emb_channels'],
-                args['emb_channels'],
-                heads=args['policy_mheads'],
-            ), 'x, edge_index -> x'),
-            BatchNorm(args['emb_channels']*args['policy_mheads']),
-            nn.ReLU(),
-            Linear(args['emb_channels']*args['policy_mheads'], 2),
-        ])
+            self.policy_head = Sequential('x, edge_index, batch', [
+                (GATConv(
+                    3*args['emb_channels'],
+                    args['emb_channels'],
+                    heads=args['policy_mheads'],
+                ), 'x, edge_index -> x'),
+                (LayerNorm(args['emb_channels']*args['policy_mheads']), 'x, batch -> x'),
+                nn.ReLU(),
+                (Linear(args['emb_channels']*args['policy_mheads'], 2), 'x -> x'),
+                (LayerNorm(2), 'x, batch -> x'),
+            ])
+
 
         self.value_head = Sequential('x, edge_index, batch', [
-            (GATv2Conv(
-                args['emb_channels'],
+            (GATConv(
+                3*args['emb_channels'],
                 args['emb_channels'],
                 heads=args['value_mheads']
             ), 'x, edge_index -> x'),
-            BatchNorm(args['emb_channels']*args['policy_mheads']),
+            (LayerNorm(args['emb_channels']*args['policy_mheads']),
+             'x, batch -> x'
+             ),
             nn.ReLU(),
-            Linear(args['emb_channels']*args['value_mheads'], args['emb_channels']*args['value_mheads']),
+            (Linear(args['emb_channels']*args['value_mheads'], args['emb_channels']*args['value_mheads']), 'x -> x'),
+            (LayerNorm(args['emb_channels']*args['policy_mheads']), 'x, batch -> x'),
             nn.ReLU(),
-            Linear(args['emb_channels']*args['value_mheads'], 1),
+            (Linear(args['emb_channels']*args['value_mheads'], 1), 'x -> x'),
         ])
 
 
-    def forward(self, node_attr, edge_index, batch=None):
+    def forward(self, node_attr, edge_index, y, batch=None):
         """
         Forward pass of the ResNet model.
 
@@ -99,11 +104,27 @@ class Net(nn.Module):
             A tuple containing the value estimation and policy logits.
         """
         x = self.encoder(node_attr)
+        x_1 = self.encoder(y)
         for block in self.hidden_blocks:
-            x = block(x, edge_index)
+            x = block(x, edge_index, batch)
 
-        policy = self.policy_head(x, edge_index).flatten().unsqueeze(0)
-        value = global_mean_pool(torch.tanh(self.value_head(x, edge_index)), batch)
+        mean = global_mean_pool(x, batch)
+        if batch != None:
+            x_n = []
+            for i in batch.unique():
+                count = (batch == i).sum()
+                x_n.append(mean[i].repeat(count, 1))
+            x_n = torch.cat(x_n, 0)
+        else:
+            x_n = mean.repeat(x.shape[0], 1)
+        x_c = torch.cat((x, x_n, x_1), dim=1)
+
+        policy = self.policy_head(x_c, edge_index, batch).flatten().unsqueeze(0)
+
+
+        v_head = self.value_head(x_c, edge_index, batch)
+        value = torch.tanh(global_mean_pool(v_head, batch))
+        print(value)
 
         return value, policy
 
@@ -126,7 +147,7 @@ class ResCovBlock(nn.Module):
     Attributes
     ----------
     in_layer : Sequential
-        Initial layer with GATv2Conv, BatchNorm, and Linear layers.
+        Initial layer with GATConv, BatchNorm, and Linear layers.
     feed_forward : nn.Sequential
         Feed-forward network with Linear and ReLU layers.
     batch_norm1 : BatchNorm
@@ -137,7 +158,7 @@ class ResCovBlock(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.in_layer = Sequential('x, edge_index', [
-            (GATv2Conv(
+            (GATConv(
                 args['emb_channels'],
                 args['emb_channels'],
                 heads=args['num_heads']
@@ -149,16 +170,16 @@ class ResCovBlock(nn.Module):
             )
         ])
 
-        self.batch_norm1 = BatchNorm(args['emb_channels'])
+        self.batch_norm1 = LayerNorm(args['emb_channels'])
 
         self.feed_forward = nn.Sequential(
             Linear(args['emb_channels'], args['ff_dim']),
             nn.ReLU(),
             Linear(args['ff_dim'], args['emb_channels'])
         )
-        self.batch_norm2 = BatchNorm(args['emb_channels'])
+        self.batch_norm2 = LayerNorm(args['emb_channels'])
 
-    def forward(self, node_attr, edge_index):
+    def forward(self, node_attr, edge_index, batch=None):
         """
         Forward pass of the ResBlock.
 
@@ -176,10 +197,10 @@ class ResCovBlock(nn.Module):
         """
         res = node_attr
         x = self.in_layer(node_attr, edge_index)
-        x = self.batch_norm1(res + x)
+        x = self.batch_norm1(res + x, batch)
 
         res = x
         x = self.feed_forward(x)
-        x = self.batch_norm2(res + x)
+        x = self.batch_norm2(res + x, batch)
 
         return x

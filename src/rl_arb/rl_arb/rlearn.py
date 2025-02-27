@@ -151,7 +151,9 @@ class AgentRLearn():
         """
         Main loop for the learning process, including self-play and training.
         """
-        for iteration in range(4, self.args['num_iterations']):
+        torch.save(self.model.state_dict(), "./model/model_0.pt")
+        torch.save(optimizer.state_dict(), "./model/optimizer_0.pt")
+        for iteration in range(0, self.args['num_iterations']):
             logger.info(f"Iterations: {iteration+1}/{self.args['num_iterations']}")
             if self.args['telegram']:
                 send_telegram_message(f"Iterations: {iteration+1}/{self.args['num_iterations']}")
@@ -177,7 +179,7 @@ class AgentRLearn():
                 self.model.to(cpu)
                 self.model.load_state_dict(
                     torch.load(
-                        f"./model/model_{iteration-1}.pt",
+                        f"./model/model_{iteration}.pt",
                         weights_only = True,
                         map_location=cpu
                     )
@@ -265,7 +267,7 @@ def train(rank, world_size, memory, mcts, iteration):
     model = Net(ARGS_MODEL)
     model.load_state_dict(
         torch.load(
-            f"./model/model_{iteration-1}.pt",
+            f"./model/model_{iteration}.pt",
             weights_only = True,
         )
     )
@@ -273,7 +275,7 @@ def train(rank, world_size, memory, mcts, iteration):
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     optimizer.load_state_dict(
         torch.load(
-            f"./model/optimizer_{iteration-1}.pt",
+            f"./model/optimizer_{iteration}.pt",
             weights_only = True,
         )
     )
@@ -287,6 +289,7 @@ def train(rank, world_size, memory, mcts, iteration):
     epoch_policy_loss = []
     epoch_value_loss = []
     avg_state_len = []
+    avg_rewards = []
     for epoch_iter in tqdm(
         range(mcts.args['num_epochs']),
         desc="epochs",
@@ -313,26 +316,41 @@ def train(rank, world_size, memory, mcts, iteration):
             data_list = [
                 Data(
                     x=mcts.mdp.encode_state(s, b),
-                    edge_index=mcts.mdp.data.edge_index
+                    edge_index=mcts.mdp.data.edge_index,
+                    y=mcts.mdp.encode_state(s[:1], b),
                  )\
                 for s, b  in zip(states, block_indices)
             ]
             batch = Batch.from_data_list(data_list).to(rank)
+
             value_outs, policy_outs = model.forward(
                 batch.x,
                 batch.edge_index,
-                batch.batch
+                batch.y,
+                batch.batch,
             )
+
             policy_outs = policy_outs.view(batch.batch_size, -1)
+
+            #policy_outs = torch.softmax(
+            #    policy_outs.view(batch.batch_size, -1),
+            #    dim=1
+            #)
+
             del batch
             del data_list
 
+#            policy_loss = F.cross_entropy
+#            value_loss = value_targets - value_outs
+#            loss = -policy_loss * value_loss
+
             policy_loss = F.cross_entropy(policy_outs, policy_targets)
             value_loss = F.mse_loss(value_outs, value_targets)
-            loss = policy_loss * value_loss
+            loss = policy_loss + value_loss
 
-            epoch_policy_loss.append(policy_loss.item())
+            epoch_policy_loss.append(loss.item())
             epoch_value_loss.append(value_loss.item())
+            avg_rewards.append(value_targets.mean().item())
             avg_state_len.append(
                 np.mean(np.array([len(s) for s in states]))
             )
@@ -343,14 +361,17 @@ def train(rank, world_size, memory, mcts, iteration):
 
         if mcts.args['telegram'] and rank == 0:
             update_me(
-                np.mean(epoch_policy_loss), np.mean(epoch_value_loss),
+                np.mean(epoch_policy_loss),
+                np.mean(epoch_value_loss),
                 np.mean(avg_state_len),
-                epoch_iter, iteration
+                np.mean(avg_rewards),
+                epoch_iter,
+                iteration,
             )
 
     if rank == 0:
-        torch.save(model.module.state_dict(), f"./model/model_{iteration}.pt")
-        torch.save(optimizer.state_dict(), f"./model/optimizer_{iteration}.pt")
+        torch.save(model.module.state_dict(), f"./model/model_{iteration+1}.pt")
+        torch.save(optimizer.state_dict(), f"./model/optimizer_{iteration+1}.pt")
 
     dist.destroy_process_group()
 

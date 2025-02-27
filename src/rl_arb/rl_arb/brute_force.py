@@ -47,19 +47,39 @@ def test_model():
     problem.model.to(DEVICE)
     problem.model.load_state_dict(
         torch.load(
-            "./model/model_7.pt",
+            "./model/model_49.pt",
             weights_only = True,
             map_location=DEVICE
         )
     )
+
     problem.model.eval()
 
-    np.random.seed(0)
-    problem.mdp.current_block = np.random.choice(problem.mdp.num_blocks)
-    logger.info(f"Current BLOCK: {problem.mdp.current_block}")
-    for s in problem.mdp.nodes[1:]:
+#    state = [(1, 1, 0), (1, 0, 0), (0, 4, 1)]
+#    data_list = [Data(
+#        problem.mdp.encode_state(state, problem.mdp.current_block-1),
+#        problem.mdp.data.edge_index,
+#        y=problem.mdp.encode_state(state[:1], problem.mdp.current_block-1)
+#    ) for _ in range(5)]
+#    batch = Batch.from_data_list(data_list)
+#    value, policy = problem.model.forward(
+#        batch.x,
+#        batch.edge_index,
+#        batch.y,
+#        batch.batch
+#    )
+#    policy = policy.view(batch.batch_size, -1).detach().cpu()
+#    print(policy)
+#    print(value)
+#    exit()
+
+#    np.random.seed(0)
+    for b in range(problem.mdp.num_blocks):
+        problem.mdp.current_block = b
         logger.info("\n")
-        state = [(s, s, 0)]
+        logger.info(f"Current BLOCK: {problem.mdp.current_block}")
+        s = 0
+        state = [(0, 0, 0)]
         t, p = brute_force_search_trail(problem.mdp, s, 7)
         max_p = np.max(p)
         logger.info(f"s: {s} trails {len(t)} max_profit: {max_p}")

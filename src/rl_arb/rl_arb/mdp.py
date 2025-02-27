@@ -87,6 +87,15 @@ class MDP:
         self.num_blocks = len(list(self.edges.items())[0][1])-1
         self.current_block = self.num_blocks
         self.device = DEVICE
+        self.start_node = 0
+
+        self.token_pool_mapping = {node: [] for node in self.nodes}
+        for node in self.nodes:
+            for k, v in line_mapping.items():
+                if node == k[0]:
+                    self.token_pool_mapping[node].append((v, 0))
+                if node == k[1]:
+                    self.token_pool_mapping[node].append((v, 1))
 
     def set_current_block(self, block_index):
         """
@@ -173,7 +182,6 @@ class MDP:
         value = 0
         terminated = False
 
-
         if len(state) >= self.args['cutoff']:
             value += -len(state)/(len(self.edges)//2)
             terminated = True
@@ -189,7 +197,6 @@ class MDP:
                 value = 1
 
             terminated = True
-            print(value)
             return value, terminated
 
         if len(valid_actions) == 0:
@@ -225,22 +232,18 @@ class MDP:
         start_node = state[0][1]
         current_node= state[-1][1]
 
+        for p, t01 in self.token_pool_mapping[start_node]:
+            e_x[p, t01+2] = 1
+
         if len(state) > 1:
+            profit = np.log(self.calculate_profit(state, at_block))
             if state[-1] in line_mapping_keys:
                 line_state_current = state[-1]
             else:
                 line_state_current = (state[-1][1], state[-1][0], state[-1][2])
 
             e_x[self.line_mapping[line_state_current],
-                line_state_current[:2].index(current_node)+2] = 1
-
-            if state[1] in line_mapping_keys:
-                line_state_start = state[1]
-            else:
-                line_state_start = (state[1][1], state[1][0], state[1][2])
-
-            e_x[self.line_mapping[line_state_start],
-                line_state_start[:2].index(start_node)+2] = 1
+                line_state_current[:2].index(current_node)+2] = profit
 
             # encode the used edges
             edge_idx = []
@@ -250,7 +253,6 @@ class MDP:
                 if (e[1], e[0], e[2]) in line_mapping_keys:
                     edge_idx.append(self.line_mapping[(e[1], e[0], e[2])])
             e_x[edge_idx, 1] = 1
-            e_x[edge_idx, 0] = 0
 
         return e_x.to(self.device)
 

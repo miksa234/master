@@ -23,18 +23,18 @@ ARGS_MODEL = {
     'num_heads': 16,
     'num_layers': 20,
     'ff_dim': 1024,
-    'policy_mheads': 8,
-    'value_mheads': 8
+    'policy_mheads': 3,
+    'value_mheads': 3
 }
 
 ARGS_TRAINING = {
-    'C': 1,
+    'C': 2,
     'C_1/3' : 2,
     'C_2/3' : 1,
     'C_3/3' : 0.5,
     'num_iterations': 50,
     'num_searches': 50,
-    'num_self_play_iterations': 2400,
+    'num_self_play_iterations': 900,
     'num_parallel': 50,
     'num_epochs': 20,
     'batch_size': 50,

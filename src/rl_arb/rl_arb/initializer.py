@@ -71,7 +71,7 @@ class Initializer():
             '../data/tokens/tokens.csv',
         )
         prices = pd.read_parquet(
-            '../data/prices/prices_deg_5_liq_100_block_18_gap_4.parquet'
+            '../data/prices/prices_deg_5_liq_100_block_18.parquet'
         )
         pools, prices = filter_pools_with_no_gradient(pools, prices)
 
