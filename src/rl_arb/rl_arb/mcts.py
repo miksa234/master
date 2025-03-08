@@ -59,7 +59,9 @@ class Node:
             parent=None,
             action_taken=None,
             prior=0,
-            visit_count=0
+            visit_count=0,
+            value_best=0,
+            value_worst=0
     ):
         self.args = args
         self.state = state
@@ -70,7 +72,9 @@ class Node:
         self.expandable_actions = mdp.get_valid_actions(state)
 
         self.visit_count = visit_count
-        self.value_best = 0
+        self.value_best = value_best
+        self.value_worst = value_worst
+        self.q_value = 0
 
         self.prior = prior
 
@@ -113,6 +117,9 @@ class Node:
 
         return best_child
 
+    def select_random(self):
+        return np.random.choice(self.children)
+
     def get_ucb(self, child):
         """
         Calculates the UCB value for a child node using the AlphaZero method.
@@ -128,10 +135,11 @@ class Node:
         float
             The UCB value for the child node using the AlphaZero method.
         """
-        q_value = child.value_best
-        u_value = np.sqrt(self.visit_count)/(child.visit_count + 1) * child.prior
+        q_value = child.q_value
+        u_value = np.sqrt(self.visit_count)/(child.visit_count + 1)
 
-        return q_value + self.args['C'] * u_value
+        return q_value + self.args['C'] * u_value * child.prior
+
 
     def expand(self, policy, mdp):
         """
@@ -164,12 +172,51 @@ class Node:
         """
         self.visit_count += 1
 
-        if self.value_best < value:
-            self.value_best = value
-
         if self.parent is not None:
             self.parent.backpropagete(value)
+            if self.value_best < value:
+                self.q_value = value/self.parent.value_best
+                self.value_best = value
 
+#        if self.parent is not None:
+#            self.parent.backpropagete(value)
+#
+#        if self.parent == None:
+#            if self.value_best < value:
+#                self.value_best = value
+#                self.q_value = 1
+#            if self.value_worst > value:
+#                self.value_worst = value
+#        else:
+#            q_norm = (value)/(self.parent.value_best-self.parent.value_worst)
+#            print(q_norm, value)
+#            if self.value_best < value:
+#                self.value_best = value
+#                self.q_value = q_norm
+#
+#            if self.value_worst > value:
+#                self.value_worst = value
+
+    def simulate(self, mdp, current_block):
+        value, terminal = mdp.get_value_and_terminated(
+            self.state,
+            current_block
+        )
+
+        if terminal:
+            return value
+
+        rollout_state = self.state.copy()
+        while True:
+            valid_actions = mdp.get_valid_actions(rollout_state)
+            action = valid_actions[np.random.choice(len(valid_actions))]
+            rollout_state = mdp.get_next_state(rollout_state, action)
+            value, terminal = mdp.get_value_and_terminated(
+                rollout_state,
+                current_block
+            )
+            if terminal:
+                return value
 
 
 class MCTS:
@@ -194,6 +241,7 @@ class MCTS:
         self.mdp = mdp
         self.args = args
         self.model = model
+        self.history = {}
 
 
     @torch.no_grad()
@@ -211,20 +259,34 @@ class MCTS:
         array-like
             The visit count distribution over actions.
         """
-        root = Node(self.mdp, self.args, state, visit_count=1)
 
-        _, policy = self.model(
+        root = Node(self.mdp, self.args, state, visit_count=1, value_best=1, value_worst=0)
+
+#        if len(state) > 1:
+#            for child in self.history[tuple(state[:-1])].children:
+#                if child.state == state:
+#                    root = child
+#                    root.parent = None
+#        self.history[tuple(state)] = root
+
+
+        policy = self.model(
             self.mdp.encode_state(root.state, self.mdp.current_block),
             self.mdp.data.edge_index,
             self.mdp.encode_state(root.state[:1], self.mdp.current_block)
         )
-        policy = torch.softmax(policy.squeeze(0), dim=0).detach().cpu()
+        policy = policy.squeeze(0).detach().cpu()
 
         policy = self.mdp.mask_policy(policy, root.state)
 
         root.expand(policy, self.mdp)
 
-        for s in range(self.args['num_searches']-len(state)):
+        for _ in range(self.args['num_rollouts']):
+            n = root.select_random()
+            v = n.simulate(self.mdp, self.mdp.current_block)
+            n.backpropagete(v)
+
+        for _ in range(self.args['num_searches']):
             node = root
             while node.is_fully_expanded():
                 node = node.select()
@@ -236,28 +298,27 @@ class MCTS:
             )
 
             if not is_terminal:
-                value, policy = self.model(
+                policy = self.model(
                     self.mdp.encode_state(root.state, self.mdp.current_block),
                     self.mdp.data.edge_index,
                     y=self.mdp.encode_state(root.state[:1], self.mdp.current_block),
                 )
-                policy = torch.softmax(policy.squeeze(0), dim=0)
+                policy = policy.squeeze(0)
                 policy = self.mdp.mask_policy(policy, node.state)
-
-                value = value.item()
 
                 node.expand(policy, self.mdp)
 
-
-            node.backpropagete(value)
+                for _ in range(self.args['num_rollouts']):
+                    n = node.select_random()
+                    v = n.simulate(self.mdp, self.mdp.current_block)
+                    n.backpropagete(v)
 
         # return visit_count distribution
-        valid_actions = self.mdp.get_valid_actions(state)
         action_probs = np.zeros(len(self.mdp.edge_list))
         for child in root.children:
             action_probs[
                 self.mdp.edge_list.index(child.action_taken)
-            ] = child.visit_count
+            ] = child.value_best
         action_probs /= np.sum(action_probs)
 
         return action_probs
@@ -287,6 +348,7 @@ class MCTSParallel:
     def __init__(self, mdp, args):
         self.mdp = mdp
         self.args = args
+        self.history = {}
 
     def set_C(self, C):
         """
@@ -317,21 +379,20 @@ class MCTSParallel:
         # batch data
         data_list = [
             Data(
-                x=self.mdp.encode_state(s, self.mdp.current_block),
+                x=self.mdp.encode_state(mem.state, mem.current_block),
                 edge_index=self.mdp.data.edge_index,
-                y=self.mdp.encode_state(s[:1], self.mdp.current_block),
+                y=self.mdp.encode_state(mem.state[:1], mem.current_block),
             )\
-            for s in states
+            for mem in p_memory
         ]
 
         batch = Batch.from_data_list(data_list).to(self.mdp.device)
-        _, policy = model.forward(batch.x, batch.edge_index, batch.y, batch.batch)
-        policy = policy.view(batch.batch_size, -1)
+        policy = model.forward(batch.x, batch.edge_index, batch.y, batch.batch)
 
         del batch
         del data_list
 
-        policy = torch.softmax(policy, dim=1).detach().cpu().numpy()
+        policy = policy.detach().cpu().numpy()
         # dirichlet random noise
         policy = (1-self.args['eps']) * policy \
             + self.args['eps'] \
@@ -344,10 +405,16 @@ class MCTSParallel:
             p_policy = torch.tensor(policy[i])
             p_policy = self.mdp.mask_policy(p_policy, states[i])
 
-            mem.root = Node(self.mdp, self.args, states[i], visit_count=1)
+            mem.root = Node(self.mdp, self.args, states[i], visit_count=1, value_best=1, value_worst=0)
+
             mem.root.expand(p_policy, self.mdp)
 
-        for _ in range(self.args['num_searches']-len(states[0])+1):
+            for _ in range(self.args['num_rollouts']):
+                rollout = mem.root.select_random()
+                value = rollout.simulate(self.mdp, mem.current_block)
+                rollout.backpropagete(value)
+
+        for _ in range(self.args['num_searches']):
             for mem in p_memory:
                 mem.node = None
                 node = mem.root
@@ -356,7 +423,7 @@ class MCTSParallel:
 
                 value, is_terminal = self.mdp.get_value_and_terminated(
                     node.state,
-                    self.mdp.current_block
+                    mem.current_block
                 )
 
                 if is_terminal:
@@ -368,49 +435,48 @@ class MCTSParallel:
 
             if len(expandable) > 0:
                 chunks = [expandable[i:i+self.args['num_parallel']] for i in range(0, len(expandable), self.args['num_parallel'])]
-                value, policy = [], []
+                policy = []
                 for chunk in chunks:
                     data_list = [
                         Data(
                             x=self.mdp.encode_state(
                                 p_memory[i].node.state,
-                                self.mdp.current_block
+                                p_memory[i].current_block
                             ),
                             edge_index=self.mdp.data.edge_index,
                             y=self.mdp.encode_state(
                                 p_memory[i].node.state[:1],
-                                self.mdp.current_block
+                                p_memory[i].current_block
                             ),
                         )\
                         for i in chunk
                     ]
 
                     batch = Batch.from_data_list(data_list).to(self.mdp.device)
-                    value_chunk, policy_chunk = model.forward(
+                    policy_chunk = model.forward(
                         batch.x,
                         batch.edge_index,
                         batch.y,
                         batch.batch,
                     )
-                    policy_chunk = policy_chunk.view(batch.batch_size, -1).detach().cpu()
-                    policy_chunk = torch.softmax(policy_chunk, dim=1)
                     policy.append(policy_chunk)
-                    value.append(value_chunk)
 
                     del batch
                     del data_list
-                value = torch.cat(value, 0)
+
                 policy = torch.cat(policy, 0)
 
 
             for i, idx in enumerate(expandable):
                 node = p_memory[idx].node
-                p_value, p_policy = value[i], policy[i]
-                p_policy = self.mdp.mask_policy(p_policy, node.state)
+                p_policy = self.mdp.mask_policy(policy[i], node.state)
 
                 node.expand(p_policy, self.mdp)
-                node.backpropagete(p_value)
 
+                for _ in range(self.args['num_rollouts']):
+                    rollout = node.select_random()
+                    value = rollout.simulate(self.mdp, p_memory[idx].current_block)
+                    rollout.backpropagete(value)
 
 class PMemory:
     """
@@ -431,7 +497,6 @@ class PMemory:
         The current node in the search tree.
     """
     def __init__(self, mdp, at_block):
-#        node = int(np.random.choice(mdp.nodes))
         self.state = [(mdp.start_node, mdp.start_node, 0)]
         self.current_block = at_block
         self.memory = []

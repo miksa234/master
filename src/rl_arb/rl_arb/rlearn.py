@@ -11,6 +11,7 @@ logger = logging.getLogger('rl_circuit')
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch import distributed as dist
 import os
+import pickle
 
 from rl_arb.net import Net
 from rl_arb.mcts import MCTSParallel, PMemory
@@ -21,9 +22,8 @@ from rl_arb.config import (
     ARGS_MODEL,
 )
 from rl_arb.utils import (
-        update_me,
-        send_telegram_message,
-        save_loss
+    update_me,
+    send_telegram_message,
 )
 
 
@@ -56,6 +56,8 @@ class AgentRLearn():
         self.mcts = MCTSParallel(mdp, self.args)
 
         self.pbar_play = False
+        self.values = []
+        self.baseline_tracker = {}
 
     def self_play(self):
         """
@@ -70,13 +72,14 @@ class AgentRLearn():
         return_mem = []
         at_block = np.random.choice(self.mcts.mdp.num_blocks)
         self.mcts.mdp.current_block = at_block
-        p_memory = [PMemory(self.mcts.mdp, at_block) for _ in range(self.args['num_parallel'])]
-
+        p_memory = [PMemory(self.mcts.mdp, np.random.choice(self.mcts.mdp.num_blocks)) for _ in range(self.args['num_parallel'])]
 
         if self.pbar_play:
             pbar = tqdm(
-                total=self.args['num_parallel'], desc='self_play',
-                token=TELEGRAM_TOKEN, chat_id=TELEGRAM_CHAT_ID,
+                total=self.args['num_parallel'],
+                desc='self_play',
+                token=str(TELEGRAM_TOKEN),
+                chat_id=str(TELEGRAM_CHAT_ID),
                 disable=not self.args['telegram']
             )
 
@@ -94,13 +97,20 @@ class AgentRLearn():
                 for child in mem.root.children:
                     probs[
                         self.mcts.mdp.edge_list.index(child.action_taken)
-                    ] = child.visit_count
+                    ] = child.q_value
+
+                if np.sum(probs) == 0:
+                    for child in mem.root.children:
+                        probs[
+                            self.mcts.mdp.edge_list.index(child.action_taken)
+                        ] = child.visit_count
 
                 probs /= np.sum(probs)
 
                 mem.memory.append((
                     mem.root.state,
-                    probs
+                    probs,
+                    mem.current_block
                 ))
 
                 action_idx = np.random.choice(
@@ -116,17 +126,33 @@ class AgentRLearn():
                 if is_terminal:
                     if self.pbar_play:
                         pbar.update(1)
-                    for hist_state, hist_probs in mem.memory:
+                    for hist_state, hist_probs, current_block in mem.memory:
                         return_mem.append((
                             hist_state,
                             hist_probs,
                             value,
-                            at_block,
+                            self.args['gamma']**(len(mem.state)-len(hist_state)),
+                            action,
+                            current_block,
                         ))
                     del p_memory[i]
 
         return return_mem
 
+    def track_baseline(self, values, gamma_factors, blocks):
+        bs = np.array(blocks)
+        vs = np.array(values)
+        baseline = np.zeros_like(bs, dtype=float)
+
+        for block in np.unique(bs):
+            idxs = np.where(bs==block)[0]
+            max_val = np.max(vs[idxs])
+            if block not in self.baseline_tracker or max_val > self.baseline_tracker[block]:
+                self.baseline_tracker[block] = max_val
+
+            baseline[idxs] = self.baseline_tracker[block]
+
+        return baseline*np.array(gamma_factors)
 
     def adapt_exploration_parameter(self, iteration):
         """
@@ -168,9 +194,9 @@ class AgentRLearn():
                 for play_iter in tqdm(
                     range(self.args['num_self_play_iterations']//self.args['num_parallel']),
                     desc="self play",
-                    token=TELEGRAM_TOKEN,
-                    chat_id=TELEGRAM_CHAT_ID,
-                    disable=not self.args['telegram']
+                    token=str(TELEGRAM_TOKEN),
+                    chat_id=str(TELEGRAM_CHAT_ID),
+                    disable=not self.args['telegram'],
                 ):
                     memory += self.self_play()
 
@@ -184,6 +210,7 @@ class AgentRLearn():
                         map_location=cpu
                     )
                 )
+                self.model.share_memory()
                 self.mcts.mdp.device = cpu
                 # multicore self-play
                 play_iter = self.args['num_self_play_iterations']
@@ -205,11 +232,29 @@ class AgentRLearn():
                     memory += result
 
 
-            np.random.shuffle(memory)
+
+            states, _, values, gamma_factors, _, blocks = zip(*memory)
+            baseline = self.track_baseline(values, gamma_factors, blocks)
+
+            memory = [(*it, float(baseline[i])) for i, it in enumerate(memory)]
+            self.values.append(np.mean(values))
+
+            if self.args['telegram']:
+                send_telegram_message(f"""
+                Average values {np.mean(values)}
+                Average values {np.mean(np.array([len(s) for s in states]))}
+                """)
+
             world_size = torch.cuda.device_count()
-            mp.spawn(train, args=(world_size, memory, self.mcts, iteration), nprocs=world_size, join=True)
+            mp.spawn(
+                train,
+                args=(world_size, memory, self.mcts, iteration),
+                nprocs=world_size,
+                join=True
+            )
 
-
+            with open("values.pickle", "wb") as f:
+                pickle.dump(self.values, f)
 
         if self.args['telegram']:
             send_telegram_message("DONE!")
@@ -263,7 +308,6 @@ def train(rank, world_size, memory, mcts, iteration):
     dist.init_process_group('nccl', rank=rank, world_size=world_size)
 
     dist.barrier()
-    map_location = {'cuda:%d' % 0: 'cuda:%d' % rank}
     model = Net(ARGS_MODEL)
     model.load_state_dict(
         torch.load(
@@ -286,22 +330,21 @@ def train(rank, world_size, memory, mcts, iteration):
     lm = len(memory)
     memory = [memory[i: i+lm//world_size] for i in range(0, lm, lm//world_size)][rank]
 
-    epoch_policy_loss = []
-    epoch_value_loss = []
+    epoch_loss = []
     avg_state_len = []
     avg_rewards = []
     for epoch_iter in tqdm(
         range(mcts.args['num_epochs']),
         desc="epochs",
-        token=TELEGRAM_TOKEN,
-        chat_id=TELEGRAM_CHAT_ID,
-        disable=(not mcts.args['telegram'] and rank != 0)
+        token=str(TELEGRAM_TOKEN),
+        chat_id=str(TELEGRAM_CHAT_ID),
+        disable=(not mcts.args['telegram'] and rank != 0),
     ):
         np.random.shuffle(memory)
         for batch_idx in range(0, len(memory), mcts.args['batch_size']):
             sample = memory[batch_idx:np.min([len(memory) - 1, batch_idx + mcts.args['batch_size']])]
             try:
-                states , policy_targets, value_targets, block_indices = zip(*sample)
+                states , policy_targets, values, gamma_factors, _, block_indices, baseline = zip(*sample)
             except ValueError: # batch is len 0.
                 print(f"batch_idx {batch_idx}")
                 print(f"From-TO : {[batch_idx, np.min([len(memory) - 1, batch_idx + mcts.args['batch_size']])]}")
@@ -309,9 +352,10 @@ def train(rank, world_size, memory, mcts, iteration):
                 print(f"len sample {len(sample)}")
                 continue
 
-            policy_targets, value_targets = np.array(policy_targets), np.array(value_targets)
+            policy_targets, value_targets = np.array(policy_targets), np.array(values)*np.array(gamma_factors)
             policy_targets = torch.tensor(policy_targets).to(rank).float()
-            value_targets = torch.tensor(value_targets).to(rank).float().unsqueeze(1)
+            value_targets = torch.tensor(value_targets).to(rank).float()
+            baseline = torch.tensor(baseline).to(rank)
 
             data_list = [
                 Data(
@@ -323,33 +367,20 @@ def train(rank, world_size, memory, mcts, iteration):
             ]
             batch = Batch.from_data_list(data_list).to(rank)
 
-            value_outs, policy_outs = model.forward(
+            policy_outs = model.forward(
                 batch.x,
                 batch.edge_index,
                 batch.y,
                 batch.batch,
             )
 
-            policy_outs = policy_outs.view(batch.batch_size, -1)
-
-            #policy_outs = torch.softmax(
-            #    policy_outs.view(batch.batch_size, -1),
-            #    dim=1
-            #)
-
             del batch
             del data_list
 
-#            policy_loss = F.cross_entropy
-#            value_loss = value_targets - value_outs
-#            loss = -policy_loss * value_loss
+            cross_entropy = F.cross_entropy(policy_outs, policy_targets)
+            loss = torch.sum(cross_entropy * (value_targets - baseline))
 
-            policy_loss = F.cross_entropy(policy_outs, policy_targets)
-            value_loss = F.mse_loss(value_outs, value_targets)
-            loss = policy_loss + value_loss
-
-            epoch_policy_loss.append(loss.item())
-            epoch_value_loss.append(value_loss.item())
+            epoch_loss.append(loss.item())
             avg_rewards.append(value_targets.mean().item())
             avg_state_len.append(
                 np.mean(np.array([len(s) for s in states]))
@@ -361,8 +392,7 @@ def train(rank, world_size, memory, mcts, iteration):
 
         if mcts.args['telegram'] and rank == 0:
             update_me(
-                np.mean(epoch_policy_loss),
-                np.mean(epoch_value_loss),
+                np.mean(epoch_loss),
                 np.mean(avg_state_len),
                 np.mean(avg_rewards),
                 epoch_iter,
@@ -387,12 +417,13 @@ def adapt_learning_rate(optimizer, iter, max_iter):
     max_iter: int
         Maximum iteration number.
     """
-    if iter < max_iter * 1/3:
-        lr = 0.01
-    if max_iter * 1/3 <= iter and iter < max_iter * 2/3:
-        lr = 0.001
-    if max_iter * 2/3 <= iter and iter < max_iter:
-        lr = 0.0001
+    lr = 0.0001
+    #    if iter < max_iter * 1/3:
+    #        lr = 0.01
+    #    if max_iter * 1/3 <= iter and iter < max_iter * 2/3:
+    #        lr = 0.001
+    #    if max_iter * 2/3 <= iter and iter < max_iter:
+    #        lr = 0.0001
 
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr

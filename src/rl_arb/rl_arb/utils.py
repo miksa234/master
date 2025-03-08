@@ -9,7 +9,7 @@ import pickle
 import requests
 from torch_geometric.nn import summary
 
-from rl_arb.config import TELEGRAM_CHAT_ID, TELEGRAM_SEND_URL
+from rl_arb.config import TELEGRAM_CHAT_ID, TELEGRAM_SEND_URL, DEVICE
 from rl_arb.logger import logging
 logger = logging.getLogger('rl_circuit')
 
@@ -214,8 +214,7 @@ def save_loss(
 
 
 def update_me(
-    policy_loss,
-    value_loss,
+    loss,
     avg_state_len,
     avg_rewards,
     epoch_iter,
@@ -242,9 +241,7 @@ def update_me(
 
     message = f"""
         ITR: {iteration+1} | EPOCH: {epoch_iter}
-        Policy loss: {policy_loss}
-        Value loss: {value_loss}
-        Total loss: {policy_loss + value_loss}
+        REINFORCE Loss: {loss}
         Average state length: {avg_state_len}
         Average rewards: {avg_rewards}
     """
@@ -263,15 +260,19 @@ def send_telegram_message(message):
     requests.post(TELEGRAM_SEND_URL, json={'chat_id': TELEGRAM_CHAT_ID, 'text': message})
 
 
-def log_info(problem):
-    """
-    Log model summary. as from.
-    """
-    l_p = len(problem.pools)
-    x = torch.randn(l_p, 4)
-    edge_index = torch.randint(
-        l_p,
-        size=problem.graph_data.edge_index.shape
-    )
-    logger.info("\n"+summary(problem.model, x, edge_index))
+
+def print_summary(problem):
+
+
+    problem.mdp.data.to(DEVICE)
+    problem.mdp.device = DEVICE
+    problem.model.to(DEVICE)
+
+    state = [(0, 0, 0), (0, 5, 0)]
+    e_x = problem.mdp.encode_state(state, 0).to(DEVICE)
+    y = problem.mdp.encode_state(state, 0).to(DEVICE)
+    edge_index = problem.mdp.data.edge_index
+
+    print(summary(problem.model, e_x, edge_index, y))
+
 

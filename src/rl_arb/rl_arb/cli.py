@@ -5,7 +5,7 @@ import os
 import subprocess
 
 from rl_arb.initializer import Initializer
-from rl_arb.utils import log_info, send_telegram_message
+from rl_arb.utils import print_summary, send_telegram_message
 from rl_arb.brute_force import test_model
 from rl_arb.logger import logging
 logger = logging.getLogger('rl_circuit')
@@ -61,7 +61,7 @@ def run():
 
     elif sys.argv[1] == "info":
         problem = Initializer()
-        log_info(problem)
+        print_summary(problem)
 
     elif sys.argv[1] == "test":
         test_model()

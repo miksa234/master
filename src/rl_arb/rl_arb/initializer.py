@@ -28,7 +28,8 @@ from rl_arb.utils import (
     load_pools_and_tokens,
     make_token_graph,
     linear_node_relabel,
-    filter_pools_with_no_gradient
+    filter_pools_with_no_gradient,
+    send_telegram_message
 )
 
 
@@ -71,9 +72,12 @@ class Initializer():
             '../data/tokens/tokens.csv',
         )
         prices = pd.read_parquet(
-            '../data/prices/prices_deg_5_liq_100_block_18.parquet'
+            '../data/prices/prices_deg_5_liq_100_block_18_paths_2_gap_12h.parquet'
         )
         pools, prices = filter_pools_with_no_gradient(pools, prices)
+
+#        include = [19548000, 19476000, 21096000, 18828000, 18108000]
+#        prices= prices[prices['block_number'].isin(include)]
 
         G = make_token_graph(pools, prices)
         G, token_mapping = linear_node_relabel(G)
@@ -122,7 +126,7 @@ class Initializer():
 #            )
 #        )
 #
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 #        optimizer.load_state_dict(
 #            torch.load(
 #                "./model/optimizer_3.pt",
@@ -138,6 +142,7 @@ class Initializer():
 
         if not os.path.exists('./model'):
             os.mkdir('./model')
+
 
         self.pools = pools
         self.tokens = tokens

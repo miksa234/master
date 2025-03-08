@@ -65,26 +65,25 @@ class Net(nn.Module):
                 ), 'x, edge_index -> x'),
                 (LayerNorm(args['emb_channels']*args['policy_mheads']), 'x, batch -> x'),
                 nn.ReLU(),
-                (Linear(args['emb_channels']*args['policy_mheads'], 2), 'x -> x'),
-                (LayerNorm(2), 'x, batch -> x'),
+                (Linear(args['emb_channels']*args['policy_mheads'], 2, bias=False), 'x -> x'),
             ])
 
 
-        self.value_head = Sequential('x, edge_index, batch', [
-            (GATConv(
-                3*args['emb_channels'],
-                args['emb_channels'],
-                heads=args['value_mheads']
-            ), 'x, edge_index -> x'),
-            (LayerNorm(args['emb_channels']*args['policy_mheads']),
-             'x, batch -> x'
-             ),
-            nn.ReLU(),
-            (Linear(args['emb_channels']*args['value_mheads'], args['emb_channels']*args['value_mheads']), 'x -> x'),
-            (LayerNorm(args['emb_channels']*args['policy_mheads']), 'x, batch -> x'),
-            nn.ReLU(),
-            (Linear(args['emb_channels']*args['value_mheads'], 1), 'x -> x'),
-        ])
+#        self.value_head = Sequential('x, edge_index, batch', [
+#            (GATConv(
+#                3*args['emb_channels'],
+#                args['emb_channels'],
+#                heads=args['value_mheads']
+#            ), 'x, edge_index -> x'),
+#            (LayerNorm(args['emb_channels']*args['policy_mheads']),
+#             'x, batch -> x'
+#             ),
+#            nn.ReLU(),
+#            (Linear(args['emb_channels']*args['value_mheads'], args['emb_channels']*args['value_mheads']), 'x -> x'),
+#            (LayerNorm(args['emb_channels']*args['policy_mheads']), 'x, batch -> x'),
+#            nn.ReLU(),
+#            (Linear(args['emb_channels']*args['value_mheads'], 1), 'x -> x'),
+#        ])
 
 
     def forward(self, node_attr, edge_index, y, batch=None):
@@ -121,12 +120,15 @@ class Net(nn.Module):
 
         policy = self.policy_head(x_c, edge_index, batch).flatten().unsqueeze(0)
 
+        if batch != None:
+            policy = policy.view(len(batch.unique()), -1)
 
-        v_head = self.value_head(x_c, edge_index, batch)
-        value = torch.tanh(global_mean_pool(v_head, batch))
-        print(value)
+        policy = torch.softmax(policy, dim=1)
 
-        return value, policy
+#        v_head = self.value_head(x_c, edge_index, batch)
+#        value = torch.tanh(global_mean_pool(v_head, batch))
+
+        return policy
 
 class ResCovBlock(nn.Module):
     """
