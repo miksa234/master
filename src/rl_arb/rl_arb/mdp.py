@@ -31,6 +31,12 @@ class MDP:
         The number of blocks in the data.
     current_block : int
         The current block index.
+    device: torch.device
+        Device object.
+    start_node:
+        Starting node.
+    token_pool_mapping:
+        Dictonary with key=node value=line_mapping value.
 
     Methods:
     --------
@@ -42,9 +48,9 @@ class MDP:
         Returns the valid actions from the current state.
     check_win(state):
         Checks if the current state is a terminal state.
-    get_value_and_terminated(state):
+    get_value_and_terminated(state, at_block):
         Returns the value and whether the state is terminal.
-    encode_state(state):
+    encode_state(state, at_block):
         Encodes the current state into a tensor.
     mask_policy(policy, state):
         Masks the policy tensor based on valid actions.
@@ -171,6 +177,8 @@ class MDP:
         -----------
         state : list
             The current state represented as a list of nodes.
+        at_block: int
+            Block of state.
 
         Returns:
         --------
@@ -217,6 +225,8 @@ class MDP:
         -----------
         state : list
             The current state represented as a list of nodes.
+        at_block: int
+            Block of state.
 
         Returns:
         --------

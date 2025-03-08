@@ -31,23 +31,28 @@ class Node:
         The list of child nodes.
     expandable_actions : list
         The list of actions that can be taken from this node.
+    visit_count: int
+        Number of times visited in the MCTS process.
     value_best: float
         The best of values backpropagated through this node.
+    q_value: float
+        Normalized value_best based on parent value_best.
+
 
     Methods
     -------
     is_fully_expanded():
         Checks if the node is fully expanded.
-    select(ucb_method='alphazero'):
+    select():
         Selects the child node with the highest UCB value.
+    select():
+        Selects the child node randomly.
     get_ucb(child):
         Calculates the UCB value for a child node.
-    expand(mdp):
-        Expands the node by adding a child node.
-    expand_alphazero(policy, mdp):
-        Expands the node using the AlphaZero policy.
+    expand(policy, mdp):
+        Expands all possible actions, creating net policy output.
     simulate(mdp):
-        Simulates a rollout from the current state.
+        Simulates a rollout from the current state randomly.
     backpropagete(value):
         Backpropagates the value through the tree.
     """
@@ -61,22 +66,20 @@ class Node:
             prior=0,
             visit_count=0,
             value_best=0,
-            value_worst=0
     ):
         self.args = args
         self.state = state
         self.parent = parent
         self.action_taken = action_taken
+        self.prior = prior
 
         self.children = []
         self.expandable_actions = mdp.get_valid_actions(state)
 
         self.visit_count = visit_count
         self.value_best = value_best
-        self.value_worst = value_worst
         self.q_value = 0
 
-        self.prior = prior
 
     def is_fully_expanded(self):
         """
@@ -143,7 +146,7 @@ class Node:
 
     def expand(self, policy, mdp):
         """
-        Expands the node using the AlphaZero policy.
+        Expands the node using the policy.
 
         Parameters
         ----------
@@ -177,25 +180,6 @@ class Node:
             if self.value_best < value:
                 self.q_value = value/self.parent.value_best
                 self.value_best = value
-
-#        if self.parent is not None:
-#            self.parent.backpropagete(value)
-#
-#        if self.parent == None:
-#            if self.value_best < value:
-#                self.value_best = value
-#                self.q_value = 1
-#            if self.value_worst > value:
-#                self.value_worst = value
-#        else:
-#            q_norm = (value)/(self.parent.value_best-self.parent.value_worst)
-#            print(q_norm, value)
-#            if self.value_best < value:
-#                self.value_best = value
-#                self.q_value = q_norm
-#
-#            if self.value_worst > value:
-#                self.value_worst = value
 
     def simulate(self, mdp, current_block):
         value, terminal = mdp.get_value_and_terminated(
@@ -241,7 +225,6 @@ class MCTS:
         self.mdp = mdp
         self.args = args
         self.model = model
-        self.history = {}
 
 
     @torch.no_grad()
@@ -260,15 +243,7 @@ class MCTS:
             The visit count distribution over actions.
         """
 
-        root = Node(self.mdp, self.args, state, visit_count=1, value_best=1, value_worst=0)
-
-#        if len(state) > 1:
-#            for child in self.history[tuple(state[:-1])].children:
-#                if child.state == state:
-#                    root = child
-#                    root.parent = None
-#        self.history[tuple(state)] = root
-
+        root = Node(self.mdp, self.args, state, visit_count=1, value_best=1)
 
         policy = self.model(
             self.mdp.encode_state(root.state, self.mdp.current_block),
@@ -335,20 +310,17 @@ class MCTSParallel:
         The mdp object.
     args : dict
         Arguments for the MCTS.
-    model : nn.Module
-        The model used for policy and value predictions.
 
     Methods
     -------
     set_C(C):
         Sets the exploration parameter for the MCTS.
-    search(states, p_memory):
+    search(model, states, p_memory):
         Performs the parallel MCTS search from the given states.
     """
     def __init__(self, mdp, args):
         self.mdp = mdp
         self.args = args
-        self.history = {}
 
     def set_C(self, C):
         """
@@ -370,6 +342,8 @@ class MCTSParallel:
 
         Parameters
         ----------
+        model: Net
+            Deep GNN computes the policy.
         states : list[tuple]
             The list of states to search from.
         p_memory : list[Pmemory]
@@ -405,7 +379,7 @@ class MCTSParallel:
             p_policy = torch.tensor(policy[i])
             p_policy = self.mdp.mask_policy(p_policy, states[i])
 
-            mem.root = Node(self.mdp, self.args, states[i], visit_count=1, value_best=1, value_worst=0)
+            mem.root = Node(self.mdp, self.args, states[i], visit_count=1, value_best=1)
 
             mem.root.expand(p_policy, self.mdp)
 

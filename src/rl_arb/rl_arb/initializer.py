@@ -76,9 +76,6 @@ class Initializer():
         )
         pools, prices = filter_pools_with_no_gradient(pools, prices)
 
-#        include = [19548000, 19476000, 21096000, 18828000, 18108000]
-#        prices= prices[prices['block_number'].isin(include)]
-
         G = make_token_graph(pools, prices)
         G, token_mapping = linear_node_relabel(G)
 
@@ -126,7 +123,7 @@ class Initializer():
 #            )
 #        )
 #
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 #        optimizer.load_state_dict(
 #            torch.load(
 #                "./model/optimizer_3.pt",

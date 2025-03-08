@@ -17,6 +17,25 @@ logger = logging.getLogger('rl_circuit')
 
 
 def brute_force_search_trail(mdp, source, cap):
+    """
+    Brute force solution of the MDP problem, by doing recursive depth first
+    search and capping the length of the state by 'cap'
+
+    Parameters
+    ---------
+        mdp: MDP
+            Class of of the MDP.
+        source: int
+            Source node.
+        cap: int
+            Boundary on solution length.
+
+    Returns
+    -------
+    tuple
+        - list of solutions
+        - list of values of solutions performance (profit)
+    """
     def dfs(state):
         if len(state) > cap:
             return
@@ -42,6 +61,9 @@ def brute_force_search_trail(mdp, source, cap):
 
 @torch.no_grad()
 def test_model():
+    """
+        Testing function
+    """
     problem = Initializer()
 
     problem.mdp.data.to(DEVICE)

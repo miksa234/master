@@ -48,8 +48,10 @@ class AgentRLearn():
             Executes self-play to generate training data.
         train(memory)
             Trains the model using the training data from self_play.
-        learn()
-            Main loop for the learning process, including self_play and training.
+        track_baseline(values, gamma_factors, blocks)
+            Updates the baseline_tracker and give baseline values for current iteration.
+        adapt_exploration_parameter(iteration)
+            Updates the exploration parameter of the UCB formula for based on interation number.
         """
         self.model = model
         self.args = args
@@ -271,6 +273,10 @@ def self_play_num_times(rlearn, times=100, device='cpu', pbar=False):
         The AgentRLearn instance to use for self-play.
     times : int, optional
         The number of self-play iterations to perform (default is 100).
+    device: string, optional
+        Device to execute the code.
+    pbar: bool, optional
+        Print a tqdm bar or not.
 
     Returns
     -------
@@ -325,7 +331,6 @@ def train(rank, world_size, memory, mcts, iteration):
     )
 
     model = DDP(model, device_ids=[rank])
-    adapt_learning_rate(optimizer, iteration, mcts.args['num_iterations'])
 
     lm = len(memory)
     memory = [memory[i: i+lm//world_size] for i in range(0, lm, lm//world_size)][rank]
@@ -404,26 +409,3 @@ def train(rank, world_size, memory, mcts, iteration):
         torch.save(optimizer.state_dict(), f"./model/optimizer_{iteration+1}.pt")
 
     dist.destroy_process_group()
-
-
-def adapt_learning_rate(optimizer, iter, max_iter):
-    """
-    Adapts the learning rate of the optimzer.
-
-    Parameters
-    ----------
-    iter: int
-        The current iteration number.
-    max_iter: int
-        Maximum iteration number.
-    """
-    lr = 0.0001
-    #    if iter < max_iter * 1/3:
-    #        lr = 0.01
-    #    if max_iter * 1/3 <= iter and iter < max_iter * 2/3:
-    #        lr = 0.001
-    #    if max_iter * 2/3 <= iter and iter < max_iter:
-    #        lr = 0.0001
-
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr

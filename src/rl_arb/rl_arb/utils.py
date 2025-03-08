@@ -225,18 +225,16 @@ def update_me(
 
     Parameters
     ----------
-    policy_loss: torch.float
-        Policy loss.
-    value_loss: torch.float
-        Value loss.
-    states: list[list[tuple]].
-        List of states.
+    loss: float
+        Loss function mean over the epoch.
+    avg_state_len: float
+        Average length of the states.
+    avg_rewards: float
+        Average rewards of the states.
+    epoch_ter: int
+        Current epoch.
     iteration: int
-        Current iteration number.
-    epoch: int
-        current_epoch.
-    telegram: bool
-        Send message via telegram or not.
+        Current iteration.
     """
 
     message = f"""
@@ -262,8 +260,13 @@ def send_telegram_message(message):
 
 
 def print_summary(problem):
+    """
+    Prints torchsummary.summary of the model.
 
-
+    Parameters
+    ----------
+        problem: Initializer
+    """
     problem.mdp.data.to(DEVICE)
     problem.mdp.device = DEVICE
     problem.model.to(DEVICE)

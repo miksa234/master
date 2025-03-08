@@ -34,7 +34,7 @@ ARGS_TRAINING = {
     'C_3/3' : 1.3,
     'num_iterations': 1000,
     'num_searches': 200,
-    'num_rollouts': 500,
+    'num_rollouts': 800,
     'num_self_play_iterations': 200,
     'num_parallel': 10,
     'num_epochs': 1,
