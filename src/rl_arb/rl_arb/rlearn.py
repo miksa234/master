@@ -110,7 +110,7 @@ class AgentRLearn():
                 probs /= np.sum(probs)
 
                 mem.memory.append((
-                    mem.root.state,
+                    mem.state.copy(),
                     probs,
                     mem.current_block
                 ))
@@ -120,7 +120,6 @@ class AgentRLearn():
                     p=probs
                 )
                 action = self.mcts.mdp.edge_list[action_idx]
-
                 mem.state = self.mcts.mdp.get_next_state(mem.state, action)
 
                 value, is_terminal = self.mcts.mdp.get_value_and_terminated(mem.state, mem.current_block)
@@ -133,7 +132,7 @@ class AgentRLearn():
                             hist_state,
                             hist_probs,
                             value,
-                            self.args['gamma']**(len(mem.state)-len(hist_state)),
+                            self.args['gamma']**(len(mem.state)-(len(hist_state)+1)),
                             action,
                             current_block,
                         ))
@@ -181,7 +180,7 @@ class AgentRLearn():
         """
         torch.save(self.model.state_dict(), "./model/model_0.pt")
         torch.save(optimizer.state_dict(), "./model/optimizer_0.pt")
-        for iteration in range(0, self.args['num_iterations']):
+        for iteration in range(660, self.args['num_iterations']):
             logger.info(f"Iterations: {iteration+1}/{self.args['num_iterations']}")
             if self.args['telegram']:
                 send_telegram_message(f"Iterations: {iteration+1}/{self.args['num_iterations']}")
@@ -239,12 +238,16 @@ class AgentRLearn():
             baseline = self.track_baseline(values, gamma_factors, blocks)
 
             memory = [(*it, float(baseline[i])) for i, it in enumerate(memory)]
-            self.values.append(np.mean(values))
 
+            terminal_idxs = np.where(np.array(gamma_factors)==1)[0]
+            terminal_values = np.array(values)[terminal_idxs]
+            terminal_states = np.array([len(s)+1 for s in states])[terminal_idxs]
+
+            self.values.append((np.mean(terminal_values), np.mean(terminal_states)))
             if self.args['telegram']:
                 send_telegram_message(f"""
-                Average values {np.mean(values)}
-                Average values {np.mean(np.array([len(s) for s in states]))}
+                Average values {np.mean(terminal_values)}
+                Average state_len {np.mean(terminal_states)}
                 """)
 
             world_size = torch.cuda.device_count()
@@ -349,7 +352,7 @@ def train(rank, world_size, memory, mcts, iteration):
         for batch_idx in range(0, len(memory), mcts.args['batch_size']):
             sample = memory[batch_idx:np.min([len(memory) - 1, batch_idx + mcts.args['batch_size']])]
             try:
-                states , policy_targets, values, gamma_factors, _, block_indices, baseline = zip(*sample)
+                states , policy_targets, values, gamma_factors, actions, block_indices, baseline = zip(*sample)
             except ValueError: # batch is len 0.
                 print(f"batch_idx {batch_idx}")
                 print(f"From-TO : {[batch_idx, np.min([len(memory) - 1, batch_idx + mcts.args['batch_size']])]}")
@@ -382,7 +385,11 @@ def train(rank, world_size, memory, mcts, iteration):
             del batch
             del data_list
 
-            cross_entropy = F.cross_entropy(policy_outs, policy_targets)
+            one_hot = torch.zeros_like(policy_outs).to(rank)
+            for a, p in zip(actions, one_hot):
+                p[mcts.mdp.edge_list.index(a)] = 1
+
+            cross_entropy = F.cross_entropy(policy_outs, one_hot)
             loss = torch.sum(cross_entropy * (value_targets - baseline))
 
             epoch_loss.append(loss.item())

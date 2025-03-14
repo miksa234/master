@@ -163,25 +163,23 @@ class Node:
                 child = Node(mdp, self.args, child_state, self, mdp.edge_list[action], prob)
                 self.children.append(child)
 
-
-    def backpropagete(self, value):
+    def simulate(self, mdp, current_block):
         """
-        Backpropagates the value through the tree.
+        Runs a random simulation on the mdp at current state untill terminal,
+        returns the value of the terminal state.
 
         Parameters
         ----------
-        value : float
-            The value to backpropagate.
+        mdp: MDP
+            MDP class object.
+        current_block: int
+            Current block index.
+
+        Returns
+        -------
+        value: float
+            State value.
         """
-        self.visit_count += 1
-
-        if self.parent is not None:
-            self.parent.backpropagete(value)
-            if self.value_best < value:
-                self.q_value = value/self.parent.value_best
-                self.value_best = value
-
-    def simulate(self, mdp, current_block):
         value, terminal = mdp.get_value_and_terminated(
             self.state,
             current_block
@@ -201,6 +199,23 @@ class Node:
             )
             if terminal:
                 return value
+
+    def backpropagete(self, value):
+        """
+        Backpropagates the value through the tree.
+
+        Parameters
+        ----------
+        value : float
+            The value to backpropagate.
+        """
+        self.visit_count += 1
+
+        if self.parent is not None:
+            self.parent.backpropagete(value)
+            if self.value_best < value:
+                self.q_value = value/self.parent.value_best
+                self.value_best = value
 
 
 class MCTS:
@@ -250,6 +265,7 @@ class MCTS:
             self.mdp.data.edge_index,
             self.mdp.encode_state(root.state[:1], self.mdp.current_block)
         )
+
         policy = policy.squeeze(0).detach().cpu()
 
         policy = self.mdp.mask_policy(policy, root.state)

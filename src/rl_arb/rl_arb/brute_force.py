@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import time
 import sys
+import pickle
 from torch_geometric.data import Data, Batch
 from torch_geometric.nn import summary
 
@@ -14,7 +15,6 @@ from rl_arb.initializer import Initializer
 from rl_arb.config import DEVICE
 from rl_arb.logger import logging
 logger = logging.getLogger('rl_circuit')
-
 
 def brute_force_search_trail(mdp, source, cap):
     """
@@ -71,7 +71,7 @@ def test_model():
     problem.model.to(DEVICE)
     problem.model.load_state_dict(
         torch.load(
-            "../model_1000.pt",
+            "../model_750.pt",
             weights_only = True,
             map_location=DEVICE
         ),
@@ -96,8 +96,7 @@ def test_model():
 #    ) for _ in range(5)]
 #    batch = Batch.from_data_list(data_list).to(DEVICE)
 #    policy = problem.model.forward(
-#        batch.x,
-#        batch.edge_index,
+#        batch.x, batch.edge_index,
 #        batch.y,
 #        batch.batch
 #    )
@@ -125,6 +124,8 @@ def test_model():
 
     loss = []
     values = []
+    profits = []
+    maximals = []
     for b in range(problem.mdp.num_blocks):
         problem.mdp.current_block = b
         logger.info("\n")
@@ -133,6 +134,7 @@ def test_model():
         state = [(0, 0, 0)]
         t, p = brute_force_search_trail(problem.mdp, s, 5)
         max_p = np.max(p)
+        maximals.append(max_p)
         logger.info(f"s: {s} trails {len(t)} max_profit: {max_p}")
         if len(t) > 0:
             logger.info(f"Max state {t[p.index(max_p)-1]}")
@@ -148,10 +150,10 @@ def test_model():
             state = problem.mdp.get_next_state(state, action)
 
             value, is_terminal = problem.mdp.get_value_and_terminated(state, problem.mdp.current_block)
-            values.append(value)
 
             if is_terminal:
-
+                values.append(value)
+                profit = 0
                 vs = np.array(values)
                 vs_mean = np.mean(values, where=(vs!=0))
                 vs_mean = torch.tensor(vs_mean)
@@ -166,7 +168,12 @@ def test_model():
                         logger.info(f'WON {state} with profit {profit}, {value}')
                 else:
                     logger.info(f'LOSS {state} NO valid actions, {value}')
+
+                profits.append(profit)
                 break
 
         logger.info(f"AVERAGE loss {np.mean(loss)}")
+
+    with open("train.picle", "wb") as f:
+        pickle.dump([profits, maximals, values], f)
 
