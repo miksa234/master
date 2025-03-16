@@ -1,0 +1,307 @@
+\include{./preamble.tex}
+\begin{document}
+
+\maketitle
+
+\section{CFMMs}
+A new form of financial market, Decentralized Exchanges (DEXs) also referred
+to as pool, have found its roots on top of blockchain technology. As in any
+financial market, DEXs allow an agent to trade assets, in this case
+cryptocurrencies (digital assets). Thorough a decentralized ledger stored on
+multiple computers (blockchain) the DEXs keeping track of ownership by
+storing in their storage slot. This report goes through the underlying
+principles of DEXs and their properties by mathematical modeling and
+optimization.
+
+\subsection{Basics}
+A DEX is governed by a constant function market maker (CFMM), which is a
+function $\varphi:\mathbb{R}^{n}_{+} \to \mathbb{R}_+$ the trading function
+and a set of conditions. Here $n \ge 2$ is the number of assets an agent can
+trade, these are labeled $\{1,\ldots, n\}$. The CFMM is a function of the
+reserves $y \in \mathbb{R}^{n}_+$, where $y_i \in \mathbb{R}_+$ is the
+reserve of asset $i \in \{1,\ldots,n\}$, these are in the portfolio of the
+DEX. There are two basic ways an agent can interact with the DEX:
+\begin{itemize}
+    \item Change liquidity
+    \item Trade
+\end{itemize}
+This report covers the agents' iteration by trade. The liquidity change
+could be added in the final master thesis, as part of a general introduction
+the CFMMs.
+
+An agent initializes a trade on a DEX, in which a set amount of assets is
+traded for another. A set amount of assets given is denoted by $x \in
+\mathbb{R}^{n}_+$, and the set amount of assets received by $\tilde{x} \in
+\mathbb{R}^{n}_+$. Then $x_i, \tilde{x}_i \in \mathbb{R}_+$ is the amount of
+given/received from asset $i \in \{1,\ldots,n\}$ respectively. A trade can either be
+accepted or rejected, depending on an acceptance principle of the underlying
+CFMM. If the trade is accepted the state of the pool is updated by changing
+the reserves
+\begin{align}
+    y \mapsto y + x - \tilde{x}.
+\end{align}
+A necessary condition for trade acceptance is $y \ge 0$ after the trade. In
+the case the trade is rejected the reserves do not change. Throughout we
+also assume that the vectors $x$ and $\tilde{x}$ have disjoint support. This
+is a valid assumption, since when trading, the agent is never giving and receiving a
+the same asset, but rather one or multiple different ones. The
+support of a vector $v \in \mathbb{R}^{n}_+$ is $\text{supp}(v) := \{i\; |\;
+v_i > 0\}$, thus the assumption is $\text{supp}(x)\;\cap\;
+\text{supp}(\tilde{x}) = \emptyset$.
+
+A trade $(x, \tilde{x})$ is accepted, if the trading function $\varphi$
+stays constant during the trade
+\begin{align}
+    \varphi(y+\gamma x - \tilde{x}) = \varphi(y).
+\end{align}
+Depending on the CFMM, a trade has a fee $\gamma \in (0, 1]$, where
+$(1-\gamma)x$ of the set amount given assets is distributed to liquidity
+providers for the reward of providing liquidity. The discounted amount
+$\gamma x$ is actually being exchanged for $\tilde{x}$, but the reserves are
+updated by the full amount $x - \tilde{x}$.
+
+Throughout we assume that the trading function $\varphi$ is concave,
+increasing and differentiable, as it is implemented by Uniswap
+\cite{uniswap}, Balancer \cite{balancer}, Sushiswap \cite{sushiswap}, CurveFI
+\cite{curvefi} and many others. Most of them are also homogenious
+$\varphi(\alpha y)=\alpha(y)$, for all $\alpha \ge 0$.
+\subsubsection{CFMMs Examples}
+
+Weighted sum trading function
+\begin{align}
+    \varphi(y) = p^{T}y = \sum_{i=1}^{n} p_i y_i, \label{eq: weighted_sum}
+\end{align}
+where $p_i$ is called the price of asset $i$. The trade acceptance condition
+simplifies to
+\begin{align}
+    &\varphi(y+\gamma x- \tilde{x}) = \varphi(y) \nonumber \\
+    &p^{T} (y +\gamma x - \tilde{x}) = p^{T} y \nonumber \\
+    &\gamma p^{T} x = p^{T} \tilde{x}.
+\end{align}
+The weighted geometric mean trading function
+\begin{align}
+    \varphi(y) = \prod_{i=1}^{n} y_i^{w_i}, \label{eq: weighted_geo_mean}
+\end{align}
+where $w_i > 0 $ and $\|w \|_1= 1$. We can simplify the trade acceptance
+condition by splitting the product (ln of sum) in the indices of
+$\text{supp}(x)$ and $\text{supp}(\tilde{x})$
+\begin{align}
+    \varphi(y+\gamma x- \tilde{x}) &= \varphi(y) \nonumber \\
+    \prod\limits_{\substack{i \in \text{supp}(x) \\
+    j \in \text{supp}(\tilde{x}) \\
+    k \notin \text{supp}(x)\; \cup\; \text{supp}(\tilde{x})  }}
+    (y_i + \gamma x_i)^{w_i}
+    (y_j - \tilde{x}_j)^{w_j}
+    (y_k)^{w_k} &= \prod_{i=1}^{n} (y_i)^{w_i} \nonumber\\
+    \prod\limits_{\substack{i \in \text{supp}(x) \\
+    j \in \text{supp}(\tilde{x})}}
+    \left(1 + \frac{\gamma x_i}{y_i}\right)^{w_i}
+    \left(1 - \frac{\tilde{x}_j}{y_j}\right)^{w_j}
+    &= 1.\label{eq: wm_trade_acceptance}
+\end{align}
+For $|\text{supp}(x)| = |\text{supp}(\tilde{x})| = 1$, let $i$ and $j$ be the
+corresponding indices of the giving and receiving asset then we can
+explicitly derive an analytic expression for $x_i$ (or $\tilde{x}_j$) by
+taking the power of $w_i$ (or $w_j$) and rearranging of equation
+\ref{eq: wm_trade_acceptance}.
+\begin{align}
+&x_i = \frac{y_i}{\gamma}\left(
+\frac{y_j^{w_j/w_i}}{\left(y_j - \tilde{x}_j \right)^{w_j/w_i}} - 1
+\right)\\
+&\tilde{x}_j= y_j\left(
+    1 - \frac{y_i^{w_i/w_j}}{\left(y_i+\gamma x_i\right)^{w_i/w_j} }
+\right)
+\end{align}
+Note that the weighted geometric mean is homogenious because the weights sum
+up to one, i.e. $\| w \|_1 = 1$
+
+
+Curve \cite{stableswap} market makers implement the following trading function
+\begin{align}
+    \varphi(y) =\|y\|_1 - \alpha \prod_{i=1}^{n} y_i^{-1} ,
+\end{align}
+for $\alpha > 0$, used for stable coin markets to reduce price impact without
+large counter liquidity. A aggregated generalization is a convex combination between
+the geometric weighted mean and the (un)weighted sum
+\begin{align}
+    \varphi(y) =(1-\alpha)\|y\|_1 - \alpha \prod_{i=1}^{n} y_i^{w_i},
+\end{align}
+where $\| w\|_1 = 1$, $w_i > 0$ and $\alpha \in [0,1]$. For $\alpha = 0$, the
+trading function becomes the weighted sum and for $\alpha = 1$ the geometric
+weighted mean.
+
+\subsubsection{Concentrated Liquidity}
+Another implementation of CFMM are automated market makers with concentrated
+liquidity like UniswapV3 \cite{uniswapv3_paper}. The idea is to split
+liquidity provision from the whole sublevel set
+$\varphi(y +\gamma x-\tilde{x}) =\varphi(y)$ to multiple sets. The splitting
+happens is determined by ticks $\{p(i)\}_{i \in \mathbb{Z} }$ and the rate
+usually set $p(i) = 1.0001^{i}$, where $p(i)$ is the so called marginal
+exchange rate of the tick. Every tick range
+\begin{align}
+    (p(i), p(i+1)],
+\end{align}
+has its own part of reserves (liquidity) and is governed by a one trading
+function $\varphi$ depending on the liquidity bound by the tick range. The
+trade is executed, when the marginal exchange rate is in the rage, on a
+specifically provided liquidity. The liquidity providers specify an upper and
+a lower bound $(p(U), p(L)]$ and provide liquidity on depth $\tilde{k} =
+\varphi(y)$. They earn, split by weighted amount liquidity provided, the fees
+of the trade associated with the CFMM.
+
+During a trade when the marginal exchange rate raises above a trick range,
+the tick range is flipped to the next one and the rest of the trade is
+executed on the new tick range. This however is associated with more
+transaction cost for the agent conducting the trade.
+\subsection{First order approximations}
+Let $\nabla \varphi(y) = P$ be the vector of unscaled prices, $P$ is positive
+in all entries because $\varphi$ is by assumption increasing. The entries by
+the gradient are
+\begin{align}
+    P_i = \frac{\partial \varphi(y)}{\partial y_i}
+\end{align}
+The reported price also called the marginal exchange rate is defined as
+ration between the unscaled prices and the last unscaled price
+\begin{align}
+    p_i = \frac{P_i}{P_n},
+\end{align}
+where $p_n = 1$ always.
+
+Recall the trade acceptance condition
+\begin{align}
+    \varphi(y + \gamma x - \tilde{x}) - \varphi(y) = 0
+\end{align}
+First order Taylor expansion of $(y + \gamma x - \tilde{x})$ around $y$ gives us
+\begin{align}
+    \varphi(y + \gamma x - \tilde{x}) - \varphi(y) &\simeq \nabla
+    \varphi(y)^{T} (\gamma x - \tilde{x}) \\
+                   &=P^{T} (\gamma x - \tilde{x}),
+\end{align}
+rearranging gives
+\begin{align}
+    \gamma \sum_{i \in \text{supp}(x) } P_i x_i \simeq \sum_{i \in
+    \text{supp}(\tilde{x}) } P_i \tilde{x}_i,
+\end{align}
+which is scaling invariant (homogenious). Hence dividing by $P_n$
+\begin{align}
+    \gamma \sum_{i \in \text{supp}(x) } p_i x_i \simeq \sum_{i \in
+    \text{supp}(\tilde{x}) } p_i \tilde{x}_i,
+\end{align}
+also holds. Note that this is a first order approximation, similarly to a
+midpoint price in an order book. The actual trades are completely
+determine by the trade acceptance condition.
+\subsection{Swaps}
+The most common type of trade interaction with a DEX is a swap, i.e. a two
+asset trade. Denote these two assets with index $i$ and index $j$, then
+$x=\delta e_i$, $\tilde{x}=\tilde{\delta} e_j$, where $\delta, \tilde{\delta}
+\in \mathbb{R}_+$ and $e_i,e_j$ are the canonical basis vectors of
+$\mathbb{R}^{n}$, $i \neq j$ (disjoint support). The trade acceptance
+condition is then
+\begin{align}
+    \varphi(y + \gamma\delta e_i - \tilde{\delta}e_j) = \varphi(y).
+\end{align}
+It follows from the assumptions on $\varphi$, that the left hand side of the
+equation $\varphi(y + \gamma\delta e_i - \tilde{\delta}e_j)$ is increasing
+in $\delta$ and decreasing in $\tilde{\delta}$. Hence, for all $\delta \ge 0$
+there is at most one $\tilde{\delta}$ which satisfies the trade acceptance
+condition. Respectively for all $\tilde{\delta} \ge 0$ there is at most one
+$\delta$ satisfying the trade acceptance condition. Thereby $\delta$ and
+$\tilde{\delta}$ have a one to one function correspondence, and two asset
+trades are uniquely determined by either $\delta$ or $\tilde{\delta}$.
+
+In this case it is natural to define this function $F: \mathbb{R}_+ \to
+\mathbb{R}$, and call it the forward exchange function. Where $F(\delta)$ is
+unique to one $\tilde{\delta}$. The function $F$ is objective for all valid
+trades, additionally the function is increasing since $\varphi$ is
+increasing. Also $F$ is nonnegative, because $F(0) = 0$ and it is concave.
+Use the implicit function theorem on the trade acceptance condition
+\begin{align}
+$f(\delta, \tilde{\delta}) = \varphi(y + \gamma\delta e_i -\tilde{\delta}e_j)
+- \varphi(y) =0,
+\end{align}
+denote $y' = y+\gamma\delta e_i + \tilde{\delta}e_j$, the chain rule gives
+\begin{align}
+    F'(\delta) &= -\frac{\partial_\delta f(\delta,
+    \tilde{\delta})}{\partial_{\tilde{\delta}} f(\delta, \tilde{\delta})}\\
+       &=\gamma \frac{\left( \nabla_y \varphi(y') \right)_i}{\left( \nabla_y
+       \varphi(y') \right)_j}
+\end{align}
+Together with the properties of $\varphi$, it can be shown that $F$ is
+concave by showing that
+\begin{align}
+    F(\delta') \le F'(\delta)(\delta' - \delta) + F(\delta),
+\end{align}
+holds for all $\delta, \delta' \ge 0$ valid. Let $y'' = y + \gamma \delta' e_i -
+F(\delta') e_j$ and note that $\varphi(y) = \varphi(y') = \varphi(y'')$ as
+part of the trade acceptance condition. Since $\varphi$ is a concave function
+\begin{align}
+    \varphi(y'') \le \nabla_y\varphi(y')^{T} (y'' -y')+ \varphi(y'),
+\end{align}
+or simply
+\begin{align}
+    \nabla_y\varphi(y')^{T} (y'' - y') \ge 0.
+\end{align}
+Plugging in for $y''$ and $y'$ we get
+\begin{align}
+    &0 \le (\delta' -\delta)(\nabla_y \varphi(y'))_i - (F(\delta') -
+    F(\delta))(\nabla_y \varphi(y'))_j \\
+    &0 \le (\delta' -\delta)\frac{(\nabla_y \varphi(y'))_i}{(\nabla_y
+    \varphi(y'))_j} - (F(\delta') - F(\delta))\\
+    & F(\delta') \le F'(\delta)(\delta' - \delta) + F(\delta').
+\end{align}
+
+Respectively a definition of the reverse exchange function $G: \mathbb{R} _+
+\to \mathbb{R} \cup {\infty}$, G(\tilde{\delta}) uniquely determined by
+$\delta$ satisfying the trade acceptance condition. If no such $\delta$
+exists then the function is mapped to $\{\infty\}$. The reverse exchange
+function is nonnegative and increasing because of $\varphi$, but it is
+convex. To show convexity, use the implicit function theorem
+\begin{align}
+    G'(\tilde{\delta})  &= -\frac{\partial_{\tilde{\delta}} f(\delta,
+    \tilde{\delta})}{\partial_{\delta} f(\delta, \tilde{\delta})}\\
+       &=\frac{1}{\gamma} \frac{\left( \nabla_y \varphi(y') \right)_j}{\left( \nabla_y
+       \varphi(y') \right)_i}.
+\end{align}
+It needs to be shown that
+\begin{align}
+    G(\tilde{\delta}') \ge G'(\tilde{\delta})(\tilde{\delta}' -
+    \tilde{\delta}) + G(\tilde{\delta})
+\end{align}
+Set $y'' = y + \gamma G(\tilde{\delta}')e_i - \tilde{\delta}'e_j$ similarly
+with the forward exchange function we exploit the concavity of the trading
+function $\varphi$ and the trade acceptance condition
+\begin{align}
+    &\nabla_y \varphi(y')^{T} (y'' - y') \ge 0\\
+    &(G(\tilde{\delta}') - G(\tilde{\delta}))(\nabla_y \varphi(y'))_i
+    - (\tilde{\delta}' - \tilde{\delta})(\nabla_y \varphi(y'))_j \ge 0\\
+    &(G(\tilde{\delta}') - G(\tilde{\delta}))
+    - (\tilde{\delta}' - \tilde{\delta})\frac{(\nabla_y
+    \varphi(y'))_j}{(\nabla_y \varphi(y'))_i} \ge 0\\
+    &G(\tilde{\delta}') \ge
+    - (\tilde{\delta}' - \tilde{\delta})G'(\tilde{\delta}')
+    + G(\tilde{\delta})
+\end{align}
+
+
+
+
+\section{General Trades}
+
+\subsection{Utility optimization}
+
+\subsection{Optimality Conditions}
+
+\subsection{Arbitrage}
+
+\subsection{Transaction Cost}
+
+\nocite{bot_optimization}
+\nocite{optimal_routing_cfmm}
+\nocite{boyd_optimization}
+\nocite{cfmms_basics}
+\nocite{convex_network_flows}
+\nocite{uniswap}
+\nocite{balancer}
+\printbibliography
+
+\end{document}

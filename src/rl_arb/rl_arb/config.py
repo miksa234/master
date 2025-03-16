@@ -28,22 +28,22 @@ ARGS_MODEL = {
 }
 
 ARGS_TRAINING = {
-    'C': 1.5,
+    'C': 1.4,
     'C_1/3' : 1.3,
     'C_2/3' : 1.3,
     'C_3/3' : 1.3,
     'num_iterations': 1000,
     'num_searches': 200,
-    'num_rollouts': 800,
-    'num_self_play_iterations': 400,
-    'num_parallel': 20,
+    'num_rollouts': 0,
+    'num_self_play_iterations': 300,
+    'num_parallel': 10,
     'num_epochs': 1,
     'batch_size': 50,
     'gamma': 0.98,
     'temperature': 1.25,
     'eps': 0.25,
     'dirichlet_alpha': 0.03,
-    'num_processes': 20,
+    'num_processes': 30,
     'multicore': True,
     'telegram': True,
 }

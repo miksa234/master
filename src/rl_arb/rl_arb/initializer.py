@@ -123,7 +123,7 @@ class Initializer():
 #            )
 #        )
 #
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-4)
 #        optimizer.load_state_dict(
 #            torch.load(
 #                "./model/optimizer_3.pt",
