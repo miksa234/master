@@ -3,6 +3,7 @@
 
 \maketitle
 
+\tableofcontents
 \section{CFMMs}
 A new form of financial market, Decentralized Exchanges (DEXs) also referred
 to as pool, have found its roots on top of blockchain technology. As in any
@@ -63,7 +64,7 @@ updated by the full amount $x - \tilde{x}$.
 Throughout assume that the trading function $\varphi$ is concave,
 increasing and differentiable, as it is implemented by Uniswap
 \cite{uniswap}, Balancer \cite{balancer}, Sushiswap \cite{sushiswap}, CurveFI
-\cite{curvefi} and many others. Most of them are also homogenious
+\cite{curvefi} and many others. Most of them are also positive homogenious
 $\varphi(\alpha y)=\alpha(y)$, for all $\alpha \ge 0$.
 \subsubsection{CFMMs Examples}
 
@@ -82,8 +83,8 @@ The weighted geometric mean trading function
 \begin{align}
     \varphi(y) = \prod_{i=1}^{n} y_i^{w_i}, \label{eq: weighted_geo_mean}
 \end{align}
-where $w_i > 0 $ and $\|w \|_1= 1$. We can simplify the trade acceptance
-condition by splitting the product ($\ln$ of sum) in the indices of
+where $w_i > 0 $ and $\sum_{i=1}^{n} w_i=1$. The trade acceptance condition can be
+simplified by splitting the product ($\ln$ of sum) in the indices of
 $\text{supp}(x)$ and $\text{supp}(\tilde{x})$
 \begin{align}
     \varphi(y+\gamma x- \tilde{x}) &= \varphi(y) \nonumber \\
@@ -112,19 +113,19 @@ taking the power of $w_i$ (or $w_j$) and rearranging of equation
     1 - \frac{y_i^{w_i/w_j}}{\left(y_i+\gamma x_i\right)^{w_i/w_j} }
 \right) \label{eq: gm_ref}
 \end{align}
-Note that the weighted geometric mean is homogenious because the weights sum
-up to one, i.e. $\| w \|_1 = 1$
+Note that the weighted geometric mean is positive homogenious because the
+weights sum up to one, i.e. $\sum_{i=1}^{n}w_i = n $
 
 
 Curve \cite{stableswap} market makers implement the following trading function
 \begin{align}
-    \varphi(y) =\|y\|_1 - \alpha \prod_{i=1}^{n} y_i^{-1} ,
+    \varphi(y) =\sum_{i=1}^{n}y_i  - \alpha \prod_{i=1}^{n} y_i^{-1} ,
 \end{align}
 for $\alpha > 0$, used for stable coin markets to reduce price impact without
-large counter liquidity. An aggregated generalization is a convex combination between
+large counter liquidity. An aggregated generalization is a combination between
 the geometric weighted mean and the (un)weighted sum
 \begin{align}
-    \varphi(y) =(1-\alpha)\|y\|_1 - \alpha \prod_{i=1}^{n} y_i^{w_i},
+    \varphi(y) =(1-\alpha)\sum_{i=1}^{n}y_i  - \alpha \prod_{i=1}^{n} y_i^{w_i},
 \end{align}
 where $\| w\|_1 = 1$, $w_i > 0$ and $\alpha \in [0,1]$. For $\alpha = 0$, the
 trading function becomes the weighted sum and for $\alpha = 1$ the geometric
@@ -182,7 +183,7 @@ rearranging gives
     \gamma \sum_{i \in \text{supp}(x) } P_i x_i \simeq \sum_{i \in
     \text{supp}(\tilde{x}) } P_i \tilde{x}_i,
 \end{align}
-which is scaling invariant (homogenious). Hence, dividing by $P_n$
+which is positive homogenious. Hence, dividing by $P_n$
 \begin{align}
     \gamma \sum_{i \in \text{supp}(x) } p_i x_i \simeq \sum_{i \in
     \text{supp}(\tilde{x}) } p_i \tilde{x}_i,
@@ -224,8 +225,8 @@ denote $y' = y+\gamma\delta e_i + \tilde{\delta}e_j$, the chain rule gives
 \begin{align}
     F'(\delta) &= -\frac{\partial_\delta f(\delta,
     \tilde{\delta})}{\partial_{\tilde{\delta}} f(\delta, \tilde{\delta})}\\
-       &=\gamma \frac{\left( \nabla_y \varphi(y') \right)_i}{\left( \nabla_y
-       \varphi(y') \right)_j} \label{eq: forward_implicit}
+       &=\gamma \frac{\partial_{y_i}\varphi(y')}{\partial_{y_j}
+       \varphi(y')} \label{eq: forward_implicit}
 \end{align}
 Together with the properties of $\varphi$, it can be shown that $F$ is
 concave by showing that
@@ -245,10 +246,10 @@ or simply
 \end{align}
 Substituting for $y''$ and $y'$ gets
 \begin{align}
-    &0 \le (\delta' -\delta)(\nabla_y \varphi(y'))_i - (F(\delta') -
-    F(\delta))(\nabla_y \varphi(y'))_j \\
-    &0 \le (\delta' -\delta)\frac{(\nabla_y \varphi(y'))_i}{(\nabla_y
-    \varphi(y'))_j} - (F(\delta') - F(\delta))\\
+    &0 \le (\delta' -\delta)\partial_{y_i} \varphi(y') - (F(\delta') -
+    F(\delta))\partial_{y_j}\varphi(y') \\
+    &0 \le (\delta' -\delta)\frac{\partial_{y_i} \varphi(y')}{\partial_{y_j}
+    \varphi(y')} - (F(\delta') - F(\delta))\\
     & F(\delta') \le F'(\delta)(\delta' - \delta) + F(\delta').
 \end{align}
 
@@ -261,8 +262,8 @@ convex. To show convexity, use the implicit function theorem
 \begin{align}
     G'(\tilde{\delta})  &= -\frac{\partial_{\tilde{\delta}} f(\delta,
     \tilde{\delta})}{\partial_{\delta} f(\delta, \tilde{\delta})}\\
-       &=\frac{1}{\gamma} \frac{\left( \nabla_y \varphi(y') \right)_j}{\left( \nabla_y
-       \varphi(y') \right)_i}.
+                        &=\frac{1}{\gamma} \frac{\partial_{y_j}\varphi(y')}{
+                    \partial_{y_i} \varphi(y')}.
 \end{align}
 It needs to be shown that
 \begin{align}
@@ -275,11 +276,11 @@ exchange function use the concavity of the trading function $\varphi$ and
 the trade acceptance condition
 \begin{align}
     &\nabla_y \varphi(y')^{T} (y'' - y') \ge 0\\
-    &(G(\tilde{\delta}') - G(\tilde{\delta}))(\nabla_y \varphi(y'))_i
-    - (\tilde{\delta}' - \tilde{\delta})(\nabla_y \varphi(y'))_j \ge 0\\
+    &(G(\tilde{\delta}') - G(\tilde{\delta}))\partial_{y_i}\varphi(y')
+    - (\tilde{\delta}' - \tilde{\delta})\partial_{y_j}\varphi(y') \ge 0\\
     &(G(\tilde{\delta}') - G(\tilde{\delta}))
-    - (\tilde{\delta}' - \tilde{\delta})\frac{(\nabla_y
-    \varphi(y'))_j}{(\nabla_y \varphi(y'))_i} \ge 0\\
+    - (\tilde{\delta}' - \tilde{\delta})\frac{\partial_{y_j}
+    \varphi(y')}{\partial_{y_i}\varphi(y')} \ge 0\\
     &G(\tilde{\delta}') \ge
     - (\tilde{\delta}' - \tilde{\delta})G'(\tilde{\delta}')
     + G(\tilde{\delta})
@@ -536,8 +537,7 @@ condition, after dividing with $\lambda P_n$ becomes
 \end{align}
 The set of prices $p$ which satisfy this condition can is denoted by
 \begin{align}
-    K := \left\{p \in \mathbb{R}_+^{n}| \; \gamma p \le \alpha U(0) \le p,\;\;
-    \alpha \ge 0  \right\}
+    K := \left\{p \in \mathbb{R}_+^{n}| \;\exists \alpha\ge0:\; \gamma p \le \alpha U(0) \le p \right\}
 \end{align}
 is in literature referred to as the no-trade cone for the utility U for trade
 function $\varphi$. The set is a cone since multiplying by any $p \in K$ by
@@ -657,7 +657,8 @@ Combining gives
 \end{align}
 When the optimal trade is zero, the agent does not trade. This is the
 case when $\psi =0$ and $x_i=\tilde{x}_i=0$ for all $i \in \{1,\ldots,m\}$.
-Thus, the trade cones are defined by the
+Thus, the no-trade cones are defined through the following inequality
+componentwise
 \begin{align}
     \gamma_i\lambda_i p_i \le A_i^{T} \nabla U(0)\le\lambda p_i \qquad
     \forall i \in \{1,\ldots,m\},

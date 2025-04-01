@@ -180,7 +180,7 @@ class AgentRLearn():
         """
         torch.save(self.model.state_dict(), "./model/model_0.pt")
         torch.save(optimizer.state_dict(), "./model/optimizer_0.pt")
-        for iteration in range(0, self.args['num_iterations']):
+        for iteration in range(660, self.args['num_iterations']):
             logger.info(f"Iterations: {iteration+1}/{self.args['num_iterations']}")
             if self.args['telegram']:
                 send_telegram_message(f"Iterations: {iteration+1}/{self.args['num_iterations']}")
@@ -238,7 +238,6 @@ class AgentRLearn():
             baseline = self.track_baseline(values, gamma_factors, blocks)
 
             memory = [(*it, float(baseline[i])) for i, it in enumerate(memory)]
-            np.random.shuffle(memory)
 
             terminal_idxs = np.where(np.array(gamma_factors)==1)[0]
             terminal_values = np.array(values)[terminal_idxs]
@@ -376,7 +375,7 @@ def train(rank, world_size, memory, mcts, iteration):
             ]
             batch = Batch.from_data_list(data_list).to(rank)
 
-            value_outs, policy_outs = model.forward(
+            policy_outs = model.forward(
                 batch.x,
                 batch.edge_index,
                 batch.y,
@@ -386,16 +385,12 @@ def train(rank, world_size, memory, mcts, iteration):
             del batch
             del data_list
 
-            value_outs = value_outs.squeeze(1)
             one_hot = torch.zeros_like(policy_outs).to(rank)
             for a, p in zip(actions, one_hot):
                 p[mcts.mdp.edge_list.index(a)] = 1
 
-#            cross_entropy = torch.sum(-torch.log(policy_outs)*policy_targets, dim=1)
-#            loss = torch.mean(cross_entropy * (value_targets - value_outs))
-            value_loss = F.mse_loss(value_outs, value_targets)
-            cross_entropy = F.cross_entropy(policy_outs, policy_targets)
-            loss = cross_entropy + value_loss
+            cross_entropy = F.cross_entropy(policy_outs, one_hot)
+            loss = torch.sum(cross_entropy * (value_targets - baseline))
 
             epoch_loss.append(loss.item())
             avg_rewards.append(value_targets.mean().item())

@@ -55,33 +55,16 @@ class Net(nn.Module):
                 ResCovBlock(args)
             )
 
-        self.policy_head = Sequential('x, edge_index, batch', [
-            (GATConv(
-                3*args['emb_channels'],
-                args['emb_channels'],
-                heads=args['policy_mheads'],
-            ), 'x, edge_index -> x'),
-            (LayerNorm(args['emb_channels']*args['policy_mheads']), 'x, batch -> x'),
-            nn.ReLU(),
-            (Linear(args['emb_channels']*args['policy_mheads'], 2, bias=False), 'x -> x'),
-        ])
-
-        self.value_head = Sequential('x, edge_index, batch', [
-            (GATConv(
-                3*args['emb_channels'],
-                args['emb_channels'],
-                heads=args['value_mheads']
-            ), 'x, edge_index -> x'),
-            (LayerNorm(args['emb_channels']*args['policy_mheads']),
-             'x, batch -> x'
-             ),
-            nn.ReLU(),
-            (Linear(args['emb_channels']*args['value_mheads'], args['emb_channels']*args['value_mheads']), 'x -> x'),
-            (LayerNorm(args['emb_channels']*args['policy_mheads']), 'x, batch -> x'),
-            nn.ReLU(),
-            (Linear(args['emb_channels']*args['value_mheads'], 1), 'x -> x'),
-        ])
-
+            self.policy_head = Sequential('x, edge_index, batch', [
+                (GATConv(
+                    3*args['emb_channels'],
+                    args['emb_channels'],
+                    heads=args['policy_mheads'],
+                ), 'x, edge_index -> x'),
+                (LayerNorm(args['emb_channels']*args['policy_mheads']), 'x, batch -> x'),
+                nn.ReLU(),
+                (Linear(args['emb_channels']*args['policy_mheads'], 2, bias=False), 'x -> x'),
+            ])
 
     def forward(self, node_attr, edge_index, y, batch=None):
         """
@@ -101,12 +84,10 @@ class Net(nn.Module):
         """
         x = self.encoder(node_attr)
         x_1 = self.encoder(y)
-
         for block in self.hidden_blocks:
             x = block(x, edge_index, batch)
 
         mean = global_mean_pool(x, batch)
-
         if batch != None:
             x_n = []
             for i in batch.unique():
@@ -115,7 +96,6 @@ class Net(nn.Module):
             x_n = torch.cat(x_n, 0)
         else:
             x_n = mean.repeat(x.shape[0], 1)
-
         x_c = torch.cat((x, x_n, x_1), dim=1)
 
         policy = self.policy_head(x_c, edge_index, batch).flatten().unsqueeze(0)
@@ -125,10 +105,7 @@ class Net(nn.Module):
 
         policy = torch.softmax(policy, dim=1)
 
-        v_head = self.value_head(x_c, edge_index, batch)
-        value = torch.sigmoid(global_mean_pool(v_head, batch))
-
-        return value, policy
+        return policy
 
 class ResCovBlock(nn.Module):
     """

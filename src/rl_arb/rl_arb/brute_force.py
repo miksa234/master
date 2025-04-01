@@ -69,14 +69,14 @@ def test_model():
     problem.mdp.data.to(DEVICE)
     problem.mdp.device = DEVICE
     problem.model.to(DEVICE)
-#    problem.model.load_state_dict(
-#        torch.load(
-#            "../model_750.pt",
-#            weights_only = True,
-#            map_location=DEVICE
-#        ),
-#        strict = False
-#    )
+    problem.model.load_state_dict(
+        torch.load(
+            "../model_750.pt",
+            weights_only = True,
+            map_location=DEVICE
+        ),
+        strict = False
+    )
     problem.model.share_memory()
     problem.model.eval()
 

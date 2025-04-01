@@ -260,21 +260,28 @@ class MCTS:
 
         root = Node(self.mdp, self.args, state, visit_count=1, value_best=1)
 
-        _, policy = self.model(
+        policy = self.model(
             self.mdp.encode_state(root.state, self.mdp.current_block),
             self.mdp.data.edge_index,
             self.mdp.encode_state(root.state[:1], self.mdp.current_block)
         )
 
         policy = policy.squeeze(0).detach().cpu()
+
         policy = self.mdp.mask_policy(policy, root.state)
 
         root.expand(policy, self.mdp)
+
+        for _ in range(self.args['num_rollouts']):
+            n = root.select_random()
+            v = n.simulate(self.mdp, self.mdp.current_block)
+            n.backpropagete(v)
 
         for _ in range(self.args['num_searches']):
             node = root
             while node.is_fully_expanded():
                 node = node.select()
+
 
             value, is_terminal = self.mdp.get_value_and_terminated(
                 node.state,
@@ -282,7 +289,7 @@ class MCTS:
             )
 
             if not is_terminal:
-                value, policy = self.model(
+                policy = self.model(
                     self.mdp.encode_state(root.state, self.mdp.current_block),
                     self.mdp.data.edge_index,
                     y=self.mdp.encode_state(root.state[:1], self.mdp.current_block),
@@ -291,10 +298,11 @@ class MCTS:
                 policy = self.mdp.mask_policy(policy, node.state)
 
                 node.expand(policy, self.mdp)
-                value = value.item()
-                print(value)
 
-            node.backpropagete(value)
+                for _ in range(self.args['num_rollouts']):
+                    n = node.select_random()
+                    v = n.simulate(self.mdp, self.mdp.current_block)
+                    n.backpropagete(v)
 
         # return visit_count distribution
         action_probs = np.zeros(len(self.mdp.edge_list))
@@ -369,7 +377,7 @@ class MCTSParallel:
         ]
 
         batch = Batch.from_data_list(data_list).to(self.mdp.device)
-        _, policy = model.forward(batch.x, batch.edge_index, batch.y, batch.batch)
+        policy = model.forward(batch.x, batch.edge_index, batch.y, batch.batch)
 
         del batch
         del data_list
@@ -388,7 +396,13 @@ class MCTSParallel:
             p_policy = self.mdp.mask_policy(p_policy, states[i])
 
             mem.root = Node(self.mdp, self.args, states[i], visit_count=1, value_best=1)
+
             mem.root.expand(p_policy, self.mdp)
+
+            for _ in range(self.args['num_rollouts']):
+                rollout = mem.root.select_random()
+                value = rollout.simulate(self.mdp, mem.current_block)
+                rollout.backpropagete(value)
 
         for _ in range(self.args['num_searches']):
             for mem in p_memory:
@@ -411,7 +425,7 @@ class MCTSParallel:
 
             if len(expandable) > 0:
                 chunks = [expandable[i:i+self.args['num_parallel']] for i in range(0, len(expandable), self.args['num_parallel'])]
-                value, policy = [], []
+                policy = []
                 for chunk in chunks:
                     data_list = [
                         Data(
@@ -429,28 +443,30 @@ class MCTSParallel:
                     ]
 
                     batch = Batch.from_data_list(data_list).to(self.mdp.device)
-                    value_chunk, policy_chunk = model.forward(
+                    policy_chunk = model.forward(
                         batch.x,
                         batch.edge_index,
                         batch.y,
                         batch.batch,
                     )
                     policy.append(policy_chunk)
-                    value.append(value_chunk)
 
                     del batch
                     del data_list
 
                 policy = torch.cat(policy, 0)
-                value = torch.cat(value, 0)
 
 
             for i, idx in enumerate(expandable):
                 node = p_memory[idx].node
-                p_value, p_policy = value[i].item(), self.mdp.mask_policy(policy[i], node.state)
+                p_policy = self.mdp.mask_policy(policy[i], node.state)
 
                 node.expand(p_policy, self.mdp)
-                node.backpropagete(p_value)
+
+                for _ in range(self.args['num_rollouts']):
+                    rollout = node.select_random()
+                    value = rollout.simulate(self.mdp, p_memory[idx].current_block)
+                    rollout.backpropagete(value)
 
 class PMemory:
     """
