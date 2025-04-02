@@ -188,7 +188,8 @@ which is positive homogenious. Hence, dividing by $P_n$
     \gamma \sum_{i \in \text{supp}(x) } p_i x_i \simeq \sum_{i \in
     \text{supp}(\tilde{x}) } p_i \tilde{x}_i,
 \end{align}
-also holds. Note that this is a first order approximation, similarly to a
+also holds.
+Note that this is a first order approximation, similarly to a
 midpoint price in an order book. The actual trades are completely
 determined by the trade acceptance condition.
 \subsection{Swaps}
@@ -209,7 +210,17 @@ there is at most one $\tilde{\delta}$ which satisfies the trade acceptance
 condition. Respectively for all $\tilde{\delta} \ge 0$ there is at most one
 $\delta$ satisfying the trade acceptance condition. Thereby $\delta$ and
 $\tilde{\delta}$ have a one-to-one function correspondence, and two asset
-trades are uniquely determined by either $\delta$ or $\tilde{\delta}$.
+trades are uniquely determined by either $\delta$ or $\tilde{\delta}$. By
+concavity we get that
+\begin{align}
+    0 &= \varphi(y+\gamma\delta e_i - \tilde{\delta}e_j) - \varphi(y)\\
+      &\le \nabla_y \varphi(y) (\gamma\delta e_i - \tilde{\delta}e_j) \\
+      &\le p_i \gamma \delta - p_j \tilde{\delta}.
+\end{align}
+Thus that
+\begin{align}
+    p_j \tilde{\delta} \le p_i \gamma \delta.
+\end{align}
 
 In this case it is natural to define this function $F: \mathbb{R}_+ \to
 \mathbb{R}$, and call it the forward exchange function. Where $F(\delta)$ is
@@ -301,8 +312,8 @@ trade).
 For the weighted sum in equation \ref{eq: weighted_sum} the forward and
 reverse exchange functions are
 \begin{align}
-    F(\delta) = \gamma \frac{p_i}{p_j}\delta
-    F(\tilde{\delta}) = \frac{1}{\gamma} \frac{p_j}{p_i},
+    F(\delta) = \gamma \frac{p_i}{p_j}\delta \\
+    F(\tilde{\delta}) = \frac{1}{\gamma} \frac{p_j}{p_i}\tilde{\delta},
 \end{align}
 for $\tilde{\delta} \le y_j$ and else $G(\tilde{\delta}) = \infty$ (invalid
 trade).
@@ -310,7 +321,7 @@ In the case there is no analytical expression for the forward and reverse
 exchange function, since the trade is uniquely defined by one variable either
 $\delta$ or $\tilde{\delta}$, one can be fixed to compute a solution to the
 trade acceptance condition numerically \ref{eq: trade_acceptance_condition}.
-Recall the Newton-Raphson method for a continuously differentiable function in
+Recall the Newton method for a continuously differentiable function in
 $\mathbb{R}$ with an initial guess $x_0$ near a root $a$ the iteration
 \begin{align}
     x_{n+1} = x_n - \frac{f(x_n)}{f'(x_n)},
@@ -319,83 +330,83 @@ converges to an $a$. We can frame the trade acceptance condition as a
 function of $\tilde{\delta}$ or $\delta$ the other respectively to arrive at
 the iterations
 \begin{align}
-    \delta_{n+1} = \delta_n - \frac{\varphi(y+\gamma\delta_n e_i
-    -\tilde{\delta}e_j) -\varphi(y)}{\partial_{y_i}\varphi(y+\gamma\delta_n e_i
+    \delta_{k+1} = \delta_k - \frac{\varphi(y+\gamma\delta_k e_i
+    -\tilde{\delta}e_j) -\varphi(y)}{\partial_{y_i}\varphi(y+\gamma\delta_k e_i
 -\tilde{\delta}e_j)}\label{eq: iter_backward},\\
-\tilde{\delta}_{n+1} = \tilde{\delta}_n + \frac{\varphi(y+\gamma\delta e_i
-    -\tilde{\delta}_ne_j) -\varphi(y)}{\partial_{y_j}\varphi(y+\gamma\delta e_i
--\tilde{\delta}_n e_j)}.
+\tilde{\delta}_{k+1} = \tilde{\delta}_k + \frac{\varphi(y+\gamma\delta e_i
+    -\tilde{\delta}_ke_j) -\varphi(y)}{\partial_{y_j}\varphi(y+\gamma\delta e_i
+-\tilde{\delta}_k e_j)}.
 \end{align}
-An adequate choice for $\delta_0$ and $\tilde{\delta}_0$ can be deduced from
-the first order approximation in section \ref{sec: first_order_approx}.
+To solve for $\tilde{\delta}^{*}$, fix $\delta$ and we can choose the
+iterates from the $\varepsilon$ ball defined by the Lipschitz continuity of
+the derivative. Since $\varphi$ is continuously differentiable, the
+derivative is also Lipschitz continuous, i.e. there exists a constant $L > 0$
+such that
 \begin{align}
-    \delta_0 = \frac{1}{\gamma}\frac{p_j}{p_i}\tilde{\delta}, \qquad
-    \tilde{\delta}_0 = \gamma\frac{p_i}{p_j}\delta.
+   |f'(\tilde{\delta}) - f'(\tilde{\delta}^{*})|  \le L |\tilde{\delta} -
+   \tilde{\delta}^{*} |.
 \end{align}
-The convergence of $\tilde{\delta}_n$ to $\tilde{\delta}^{*}$ is linearly
-decreasing, let $y_n := y + \gamma \delta e_i - \tilde{\delta}e_j$ then
+Here $f$ is the function we are solving for $f(\tilde{\delta}) = \varphi(y
++\gamma \delta e_i -\tilde{\delta}e_j) - \varphi(y)$. Then
 \begin{align}
-    |\tilde{\delta}_{n+1} - \tilde{\delta}^{*} | &\le
-    \left| \frac{\varphi (y_n) -\varphi(y)}{\partial_{y_j}\varphi(y_n)}
-    +\tilde{\delta}_n  - \tilde{\delta}^{*} \right|\\
-    &\le
-    \left| \frac{\varphi (y_n) -\varphi(y)}{\partial_{y_j}\varphi(y_n)}
-    \right| + |\tilde{\delta}_n  - \tilde{\delta}^{*} |,
+    \varepsilon := \frac{\partial_{y_j}\varphi(y_j - \tilde{\delta}^{*}
+    )}{4L}.
 \end{align}
-since $\varphi$ is concave, using equation \ref{eq: phi_concave} simplifies
-to
+Assuming that $f'(\tilde{\delta}^{*})=\partial_{y_j}\varphi(y_j -
+\tilde{\delta}^{*}) \neq 0$, we ensure that by concavity and monotonicity
+that the $f'(\tilde{\delta})\neq 0$ for all $\delta$ in the ball of
+$\varepsilon$, and also that
 \begin{align}
-    |\tilde{\delta}_{n+1} - \tilde{\delta}^{*} | &\le
-    \left| \frac{\nabla\varphi(y_n)^{T}(y_n-y)}{\partial_{y_j}\varphi(y_n)}
-    \right| + |\tilde{\delta}_n  - \tilde{\delta}^{*} |\\
-    &\le
-    \left|
-    \frac{\partial_{y_i}\varphi(y_n)}{\partial_{y_j}\varphi(y_n)}\gamma\delta
-    -
-    \frac{\partial_{y_j}\varphi(y_n)}{\partial_{y_j}\varphi(y_n)}\tilde{\delta}_n
-    \right| + |\tilde{\delta}_n  - \tilde{\delta}^{*} |.
+    \frac{1}{\partial_{y_j}\varphi(y_j - \tilde{\delta}^{*})} \le
+    \frac{1}{\partial_{y_j}\varphi(y_j - \tilde{\delta})} \le c,
 \end{align}
-Recall the concavity of $F(\delta)$ for valid $\delta$, then by the implicit
-function theorem equation \ref{eq: forward_implicit} together with the
-concave property of $F$ and setting $\delta' = 0$ the above simplifies to
+for a $c\ge0$ where $|\tilde{\delta} - \tilde{\delta}^{*}| = \varepsilon$ . Thus
 \begin{align}
-    \tilde{\delta} = F(\delta) \le F'(0) \delta = \frac{\partial_{y_i}
-    \varphi(y')}{\partial_{y_j} \varphi(y')} \gamma \delta
+    |f'(\tilde{\delta}) - f'(\tilde{\delta}^{*})| \le \frac{1}{4}
+    |f'(\tilde{\delta}^{*})|
 \end{align}
-hence
+holds for all $\tilde{\delta}$ in the epsilon ball. Then by the mean value
+theorem and Lipschitz continuity
 \begin{align}
-    \tilde{\delta} -
-    \frac{\partial_{y_i}
-    \varphi(y')}{\partial_{y_j} \varphi(y')} \gamma \delta
-    \le 0.
+    &|f(\tilde{\delta}) - f(\tilde{\delta}^{*}) -
+    f'(\tilde{\delta})(\tilde{\delta} - \tilde{\delta}^{*})| \le\\
+    &\le |f(\tilde{\delta}) - f(\tilde{\delta}^{*}) -
+    f'(\tilde{\delta})(\tilde{\delta} - \tilde{\delta}^{*})| +
+    |f'(\tilde{\delta}) - f'(\tilde{\delta}^{*})|
+    |\tilde{\delta}-\tilde{\delta}^{*} | \\
+    &\le \int_{0}^{1} |f'(\tilde{\delta}^{*} + t(\tilde{\delta}
+    -\tilde{\delta}) - f'(\tilde{\delta}^{*})| |\tilde{\delta} -
+    \tilde{\delta}^{*} | dt
+    +|f'(\tilde{\delta}) - f'(\tilde{\delta}^{*})|
+    |\tilde{\delta}-\tilde{\delta}^{*} | \\
+    &\le \int_0^1 L(1-t)
+    |\tilde{\delta} - \tilde{\delta}^{*} |^{2}dt
+    +|f'(\tilde{\delta}) - f'(\tilde{\delta}^{*})|
+    |\tilde{\delta}-\tilde{\delta}^{*} | \\
+    &\le \frac{1}{4c} |\tilde{\delta} - \tilde{\delta}^{*}| + \frac{1}{4c}
+    |\tilde{\delta} - \tilde{\delta}^{*}| = \frac{1}{2c} |\tilde{\delta} - \tilde{\delta}^{*}|
 \end{align}
-Back to the convergence rate to get
+Then for $\tilde{\delta}_0 $ in the epsilon ball the first iterate is also in
+the ball
 \begin{align}
-    |\tilde{\delta}_{n+1} - \tilde{\delta}^{*} | &\le
-    |\tilde{\delta}_{n} - \tilde{\delta}^{*} | \\
-&\le |\tilde{\delta}_{0} - \tilde{\delta}^{*} |
+    |\tilde{\delta}_{1} -\tilde{\delta}^{*} | &\le \left|\tilde{\delta}_0 -
+    \frac{f(\tilde{\delta})}{f'(\tilde{\delta)}} - \tilde{\delta}^{*}
+    \right| \\
+    &\le |f'(\tilde{\delta}_0)|^{-1} |
+    f(\tilde{\delta}_0) - f(\tilde{\delta}^{*}) -
+    f'(\tilde{\delta}_0)(\tilde{\delta}_0 - \tilde{\delta}^{*})| \\
+    &\le \frac{1}{2} |\tilde{\delta}_0-\tilde{\delta}^{*} |
 \end{align}
-Similarly for the sequence $(\delta_n)_{n\in\mathbb{N} }$ in equation
-\ref{eq: iter_backward}, with $\delta^{*}$ optimal by
+Repeating this argument $k\ge0$ times we get
 \begin{align}
-    |\delta_{n+1} - \delta^{*} | &\le
-    \left | \delta_n - \frac{\varphi(y') - \varphi(y)}{\partial_{y_i}
-    \varphi(y')} - \delta^{*}  \right | \\
-    &\le
-    \left | - \frac{\varphi(y') - \varphi(y)}{\partial_{y_i}
-    \varphi(y')} \right| + \left| \delta_n - \delta^{*}  \right |. \\
+    |\tilde{\delta}_{k+1}-\tilde{\delta}^{*} | \le \left( \frac{1}{2} \right)^{k}
+    |\tilde{\delta}_0-\tilde{\delta}^{*}|
 \end{align}
-Using the convexity of $G$
-\begin{align}
-    G(\tilde{\delta}) \ge G'(0) \tilde{\delta}\\
-    \frac{\partial_{y_j}\varphi(y')}{\partial_{y_i}\varphi(y')}\tilde{\delta}
-    - \gamma\delta \le 0,
-\end{align}
-and the concavity of $\varphi$ to arrive at
-\begin{align}
-    |\delta_{n+1} - \delta^{*} | &\le
-    |\delta_{0} - \delta^{*} |.
-\end{align}
+Thus the iterates of the Newton method $(\tilde{\delta}_k)_{k\in\mathbb{N}}$
+lie in the $\varepsilon$ ball, the iteration is well defined since the
+derivatives are not zero and the iterates converge to $\tilde{\delta}^{*}$ as
+$k\to\infty$. To solve for $\delta$, fix $\tilde{\delta}$, the proof stays
+the same.
 
 \section{General \& Optimal Trades on one CFMM}
 For general trades the agent choose a trade $(x, \tilde{x})$ from an
