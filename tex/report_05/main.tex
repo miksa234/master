@@ -350,7 +350,7 @@ Here $f$ is the function we are solving for $f(\tilde{\delta}) = \varphi(y
 +\gamma \delta e_i -\tilde{\delta}e_j) - \varphi(y)$. Then
 \begin{align}
     \varepsilon := \frac{\partial_{y_j}\varphi(y_j - \tilde{\delta}^{*}
-    )}{4L}.
+    )}{2L}.
 \end{align}
 Assuming that $f'(\tilde{\delta}^{*})=\partial_{y_j}\varphi(y_j -
 \tilde{\delta}^{*}) \neq 0$, we ensure that by concavity and monotonicity
@@ -362,11 +362,12 @@ $\varepsilon$, and also that
 \end{align}
 for a $c\ge0$ where $|\tilde{\delta} - \tilde{\delta}^{*}| = \varepsilon$ . Thus
 \begin{align}
-    |f'(\tilde{\delta}) - f'(\tilde{\delta}^{*})| \le \frac{1}{4}
+    |f'(\tilde{\delta}) - f'(\tilde{\delta}^{*})| \le \frac{1}{2}
     |f'(\tilde{\delta}^{*})|
 \end{align}
 holds for all $\tilde{\delta}$ in the epsilon ball. Then by the mean value
-theorem and Lipschitz continuity
+theorem and Lipschitz continuity for all $\tilde{\delta}$ in the
+$\varepsilon$ ball
 \begin{align}
     &|f(\tilde{\delta}) - f(\tilde{\delta}^{*}) -
     f'(\tilde{\delta})(\tilde{\delta} - \tilde{\delta}^{*})| \le\\
@@ -384,9 +385,10 @@ theorem and Lipschitz continuity
     +|f'(\tilde{\delta}) - f'(\tilde{\delta}^{*})|
     |\tilde{\delta}-\tilde{\delta}^{*} | \\
     &\le \frac{1}{4c} |\tilde{\delta} - \tilde{\delta}^{*}| + \frac{1}{4c}
-    |\tilde{\delta} - \tilde{\delta}^{*}| = \frac{1}{2c} |\tilde{\delta} - \tilde{\delta}^{*}|
+    |\tilde{\delta} - \tilde{\delta}^{*}| = \frac{1}{2c} |\tilde{\delta} -
+    \tilde{\delta}^{*}|.
 \end{align}
-Then for $\tilde{\delta}_0 $ in the epsilon ball the first iterate is also in
+For a $\tilde{\delta}_0 $ in the epsilon ball the first iterate is also in
 the ball
 \begin{align}
     |\tilde{\delta}_{1} -\tilde{\delta}^{*} | &\le \left|\tilde{\delta}_0 -
@@ -404,7 +406,7 @@ Repeating this argument $k\ge0$ times we get
 \end{align}
 Thus the iterates of the Newton method $(\tilde{\delta}_k)_{k\in\mathbb{N}}$
 lie in the $\varepsilon$ ball, the iteration is well defined since the
-derivatives are not zero and the iterates converge to $\tilde{\delta}^{*}$ as
+derivatives are non zero and the iterates converge to $\tilde{\delta}^{*}$ as
 $k\to\infty$. To solve for $\delta$, fix $\tilde{\delta}$, the proof stays
 the same.
 
@@ -501,14 +503,22 @@ But then the utility of $(x-\varepsilon, x+\tilde{\varepsilon})$ is bigger
 than that of $(x,\tilde{x})$. Hence, $(x,\tilde{x})$ is not an optimal
 solution.
 
-\subsubsection{Optimality Condition}
+\subsubsection{Optimality Condition\label{sec: optimality condition}}
 The KKT-conditions of the minimization of
 equation \ref{eq: convex_gen_trade}, i.e.
 \begin{align}
     \text{min} \quad &-U(\tilde{x}-x)\\
     \text{s.t.:}\quad & (x,\tilde{x}) \in D^{r},
 \end{align}
-are
+exists, because the convex optimization problem satisfies the Slater CQ since
+$\varphi$ increasing we can set $\tilde{x}=$ and any $x>0$ such that. \begin{align}
+    \varphi(y) - \varphi(y + \gamma x) < 0.
+\end{align}
+Since Slater CQ is satisfied so is Abadie CQ, then there is a KKT point
+$(x^{*} , \tilde{x}^{*}, \lambda^{*} , \omega^{*} , \mu^{*} )$, which is a
+sufficient condition for optimality in the convex case. So $(x^{*} ,
+\tilde{x}^{*}$) is a local minimum of the optimization problem.
+Thereby any $(x, \tilde{x}, \lambda, \omega, \mu)$ satisfying
 \begin{align}
     \begin{cases}
     \nabla_x L(x, \tilde{x}, \lambda, \omega, \mu) = 0,\\
@@ -516,8 +526,9 @@ are
     \lambda \ge 0,\; g(x, \tilde{x}) \le 0,\; \lambda g(x, \tilde{x}) = 0,\\
     \omega \ge 0,\; \omega x = 0,\\
     \mu \ge 0,\; \mu \tilde{x} = 0\\
-    \end{cases}.
+    \end{cases},
 \end{align}
+is a KKT point.
 Here $L:
 \mathbb{R}^{n}\times\mathbb{R}_+\times\mathbb{R}_+^{n}\times\mathbb{R}_+^{n}
 \to \mathbb{R} $ is the Lagrangian, and $\lambda \in \mathbb{R}_+, \omega \in
@@ -533,7 +544,7 @@ and the first two conditions give
     0 = \nabla_x L = \nabla U(\tilde{x}-x) - \lambda \gamma \nabla\varphi(y') -
     \underbrace{\omega}_{\ge0},\\
     0 = \nabla_{\tilde{x}} L = - \nabla U(\tilde{x}-x) + \lambda  \nabla\varphi(y') -
-    \underbrace{\mu}_{\ge0},\\
+    \underbrace{\mu}_{\ge0},
 \end{align}
 where $y' = y-\gamma x + \tilde{x}$. The two inequalities give
 \begin{align}
@@ -606,8 +617,8 @@ the constraint, the utility is $-\infty$, hence not acceptable.
 
 A set of optimal trades with CFMMs maximizing the utility is
 \begin{align}
-    \text{max} \quad &U(\psi) \label{eq: multi_dex_trade_orig}\\
-    \text{s.t.:}\quad & \psi = \sum_{i=1}^{m} A_i(\tilde{x}_i-x_i)\\
+    \text{max} \quad &U\left(\sum_{i=1}^{m} A_i(\tilde{x}_i-x_i)\right) \label{eq: multi_dex_trade_orig}\\
+    \text{s.t.:}\quad
                       & (x_i, \tilde{x}_i) \in D_i \;\; \forall i \in
                       \{1,\ldots,m\},
 \end{align}
@@ -622,9 +633,8 @@ satisfies the solution to the original, the proof stays the same
 component wise for all CFMMs $i \in \{1,\ldots,m\}$. The convex relaxation
 problem is
 \begin{align}
-    \text{max} \quad &U(\psi) \label{eq: multi_dex_trade}\\
-    \text{s.t.:}\quad & \psi = \sum_{i=1}^{m} A_i(\tilde{x}_i-x_i)\\
-          & (x_i, \tilde{x}_i) \in D_i^{r}
+    \text{max} \quad &U\left(\sum_{i=1}^{m} A_i(\tilde{x}_i-x_i)\right) \label{eq: multi_dex_trade}\\
+    \text{s.t.:}\quad & (x_i, \tilde{x}_i) \in D_i^{r}
           \;\; \forall i \in
           \{1,\ldots,m\},
 \end{align}
@@ -634,22 +644,25 @@ D_i^{r}  = \left\{(x, \tilde{x})|\; x, \tilde{x} \in \mathbb{R}^{|N_i|}_+, \;\;
     \varphi_i(y_i+\gamma_ix - \tilde{x}) \ge \varphi_i(y_i)
 \right\}
 \end{align}
-The Lagrangian of the problem is
+Similar to the argumentation in section \ref{sec: optimality condition} the
+Slater CQ is satisfied for all CFMM $\varphi_i$ $i \in \{1,\ldots,m\}$ by
+setting the outgoing amount to zero. This is a sufficient condition for
+optimality in the convex case. The Lagrangian of the problem is
 \begin{align}
-    L(\psi, x, \tilde{x}, \nu, \lambda, \omega, \mu) = -U(\psi) +
+    L(x, \tilde{x}, \nu, \lambda, \omega, \mu) = -U(x, \tilde{x}) +
     \nu^{T}\left(  \psi - A(x-\tilde{x})\right) + \lambda^{T} g(x, \tilde{x})
     -\omega^{T} x - \mu^{T} \tilde{x}.
 \end{align}
 The KKT conditions give
 \begin{align}
-    &0 = \nabla_\psi L = -\nabla_{\psi}U(\psi) + \nu = 0 \\
-    \implies& \nabla_\psi U(\psi) = \nu.
+    &0 = \nabla L = -\nabla U(x, \tilde{x}) + \nu = 0 \\
+    \implies& \nabla U(x, \tilde{x}) = \nu.
 \end{align}
 Also for all $i \in \{1,\ldots,m\}$
 \begin{align}
-    &\nabla_{x_i} L = A_i^{T}\nabla_\psi U(\psi) - \lambda_i\gamma\nabla\varphi_i(y_i
+    &\nabla_{x_i} L = A_i^{T}\nabla U(x, \tilde{x}) - \lambda_i\gamma\nabla\varphi_i(y_i
     +\gamma_ix_i -\tilde{x}_i) - \underbrace{\omega}_{\ge0}\\
-    &\nabla_{\tilde{x}_i} L = -A_i^{T}\nabla_\psi U(\psi) + \lambda_i\nabla\varphi_i(y_i
+    &\nabla_{\tilde{x}_i} L = -A_i^{T}\nabla U(x, \tilde{x}) + \lambda_i\nabla\varphi_i(y_i
     +\gamma_ix_i -\tilde{x}_i) - \underbrace{\omega}_{\ge0}.
 \end{align}
 Thus,
@@ -669,7 +682,7 @@ Combining gives
 When the optimal trade is zero, the agent does not trade. This is the
 case when $\psi =0$ and $x_i=\tilde{x}_i=0$ for all $i \in \{1,\ldots,m\}$.
 Thus, the no-trade cones are defined through the following inequality
-componentwise
+component-wise
 \begin{align}
     \gamma_i\lambda_i p_i \le A_i^{T} \nabla U(0)\le\lambda p_i \qquad
     \forall i \in \{1,\ldots,m\},
@@ -699,13 +712,12 @@ necessary that the trades on CFMM $i$ do not give more amount of assets that
 the maximum in a nonzero trade, i.e. $x_i \le \eta_ix_i^{*}$. The optimal
 trade needs to maximize the utility of the trade minus the transaction cost
 \begin{align}
-    \text{max} \quad &U(\psi) - q^{T}\eta  \label{eq: trade_transaction_cost}\\
-    \text{s.t.:}\quad & \psi = \sum_{i=1}^{m} A_i(\tilde{x}_i-x_i)\\
-          & (x_i, \tilde{x}_i) \in D_i^{r}\\
+    \text{max} \quad &U\left(\sum_{i=1}^{m} A_i(\tilde{x}_i-x_i)\right) - q^{T}\eta  \label{eq: trade_transaction_cost}\\
+    \text{s.t.:}\quad & (x_i, \tilde{x}_i) \in D_i^{r}\\
           &x_i \le \eta_i x_i^{*}, \quad \forall i \in\{1,\ldots,m\} \\
           &\eta_i \in \{0, 1\},
 \end{align}
-with variables $\psi, x_i, \tilde{x}_i$, $i\in\{1,\ldots,m\}$ and $\eta \in
+with variables $x_i, \tilde{x}_i$, $i\in\{1,\ldots,m\}$ and $\eta \in
 \{0,1\}^{m} $. This is a mixed integer convex optimization problem. A
 possible solution might evolve the relaxation to the condition $\eta \in [0,
 1]^{m}$ to transform it to a convex optimization problem. And introduce a
@@ -734,18 +746,16 @@ An optimal arbitrage is one that maximizes the utility under the constraints
 i.e. $U(\psi^{*}) > U(0)$ with $\psi^{*}$ the optimal solution. The
 optimization problem is then
 \begin{align}
-    \text{max} \quad &U(\psi) \label{eq: arb_trade}\\
-    \text{s.t.:}\quad & \psi = \sum_{i=1}^{m} A_i(\tilde{x}_i-x_i)\\
-          & \psi \ge 0\\
-          & (x_i, \tilde{x}_i) \in D_i^{r}
+    \text{max} \quad &U\left(\sum_{i=1}^{m} A_i(\tilde{x}_i-x_i)\right) \label{eq: arb_trade}\\
+    \text{s.t.:}\quad & (x_i, \tilde{x}_i) \in D_i^{r}
           \;\; \forall i \in
           \{1,\ldots,m\},
 \end{align}
-Again the solution $\psi=0$ is valid, but in this case there is no arbitrage
+Again the solution where $\sum_{i=1}^{m} A_i(\tilde{x}_i-x_i)=0$ is valid, but in this case there is no arbitrage
 and the agent does not trade.
 \subsubsection{Example}
-A common case is an $n$ cyclic arbitrage under linear utility $U(\psi)
-=1^{T}\psi$  with $n$ CFMMs $\varphi_i(y_i) =
+A common case is an $n$ cyclic arbitrage under linear utility $U(x, \tilde{x})
+=1^{T}\left(\sum_{i=1}^{m} A_i(\tilde{x}_i-x_i)\right)$  with $n$ CFMMs $\varphi_i(y_i) =
 \sqrt{y_{i,1}y_{i,2}}$, with $n$ distinct assets via
 \begin{align}
     1 \xrightarrow{\varphi_1} 2 \xrightarrow{\varphi_2} 3
@@ -785,9 +795,9 @@ $\mathbb{R}^{2}$. Then the matrices $A_i \in \mathbb{R}^{n\times2}  $ take the s
    1 & 0
     \end{pmatrix}.
 \end{align}
-Also, the general trade vector $\psi \in \mathbb{R}^{n}$ equality is
+Also, the general trade vector is
 \begin{align}
-    \psi =
+    \sum_{i=1}^{m} A_i(\tilde{x}_i-x_i) =
     \begin{pmatrix}
         \tilde{\delta}_n - \delta_1\\
         \tilde{\delta}_1 -\delta_2\\
@@ -819,29 +829,29 @@ Set $\xi_i = \begin{pmatrix} \delta_i & \tilde{\delta}_i\end{pmatrix} ^{T}
 1\\ 0 & 0\end{pmatrix}$. Then the constraint can be written quadratic
 constraint
 \begin{align}
-    c\xi_i + \psi_i^{T} A\xi_i \le 0.
+    c\xi_i + \left(\sum_{i=j}^{m} A_j(\tilde{x}_j-x_j)\right)_i^{T} A\xi_i \le 0.
 \end{align}
 Together with $R = \begin{pmatrix} -1 & 0 \\ 0 & 1 \end{pmatrix}$ the
 optimization problem becomes a quadratically constrained linear problem.
 \begin{align}
-    \text{max} \quad & 1^{T}\psi \label{eq: quadratically_constrained}\\
-    \text{s.t.:}\quad & \psi = \sum_{i=1}^{n} A_iR\xi_i\\
-          & \psi \ge 0 \;\; \xi_i \ge 0\\
-          & c_i^{T} \xi_i + \gamma_i \xi_i^{T} B\xi_i \le 0
+    \text{max} \quad & \sum_{i=1}^{n}1^{T}A_iR\xi_i \label{eq: quadratically_constrained}\\
+    \text{s.t.:}\quad
+          & \sum_{i=1}^{n}A_iR\xi_i \ge 0 \\
+          & \xi_i \ge 0, \;\;
+          c_i^{T} \xi_i + \gamma_i \xi_i^{T} B\xi_i \le 0
           \;\; \forall i \in \{1,\ldots,n\}.
 \end{align}
-Additionally, it is possible to transform $\psi = \sum_{i=1}^{n}A_iR\xi_i$
-into $\psi = A\xi$ for $A \in \mathbb{R}^{n\times2n}$ with entries $-1, 0,
+Additionally, it is possible use matrix factorization to factor $\sum_{i=1}^{n}A_iR\xi_i$
+into $A\xi$ for $A \in \mathbb{R}^{n\times2n}$ with entries $-1, 0,
 1$, with $\xi = \begin{pmatrix} \delta_1 & \tilde{\delta}_1 & \hdots &
 \delta_n & \tilde{\delta}_n \end{pmatrix}^{T}  \in \mathbb{R}^{2n}  $. Also,
-it is possible to pull the inequality constraint into a single constraint
+it is possible to pull the inequality constraint into a single constraints
 under the same $\xi$ with a $c \in \mathbb{R}^{2n}$ and $D \in \mathbb{R}^{2n
 \times 2n}$ consisting of $n$ blocks of $\gamma_iB$, to get
 \begin{align}
-    \text{max} \quad & 1^{T}\psi \label{eq: quadratically_constrained_general}\\
-    \text{s.t.:}\quad & \psi - A\xi = 0\\
-          & c^{T} \xi + \xi^{T} D\xi \le 0\\
-          & \psi \ge 0 \;\; \xi \ge 0.
+    \text{max} \quad & 1^{T}A\xi \label{eq: quadratically_constrained_general}\\
+    \text{s.t.:}\quad & c^{T} \xi + \xi^{T} D\xi \le 0\\
+          & \xi \ge 0.
 \end{align}
 
 
