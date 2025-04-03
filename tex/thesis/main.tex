@@ -1,15 +1,8 @@
-\documentclass[a4paper]{article}
+\documentclass[a4paper,11pt,twoside,draft=false]{scrbook}
 
-\usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
-\usepackage{mlmodern}
-
-%\usepackage{ngerman}	% Sprachanpassung Deutsch
+\usepackage{UniWien_MSc-Deckblatt}
 
 \usepackage{graphicx}
-\usepackage{geometry}
-\geometry{a4paper, top=15mm}
-
 \usepackage{subcaption}
 \usepackage[shortlabels]{enumitem}
 \usepackage{amssymb}
@@ -20,28 +13,38 @@
 \usepackage{bbm}
 \usepackage{graphicx}
 \usepackage{float}
-\usepackage{yhmath}
 \usepackage{scratch}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
-
-\usepackage[backend=biber, sorting=none]{biblatex}
-\addbibresource{../cite.bib}
+\usepackage[colorlinks=true,naturalnames=true,plainpages=false,pdfpagelabels=true]{hyperref}
 
 \usepackage{tikz}
-\usepackage[framemethod=TikZ]{mdframed}
 \usetikzlibrary{patterns,decorations.pathmorphing,positioning}
 \usetikzlibrary{calc,decorations.markings, shapes.geometric}
+\usepackage[framemethod=TikZ]{mdframed}
 \tikzstyle{titlered} =
     [draw=black, thick, fill=white,%
         text=black, rectangle,
         right, minimum height=.7cm]
 
+\usepackage[backend=biber, sorting=none]{biblatex}
+\addbibresource{./cite.bib}
 
-\usepackage[colorlinks=true,naturalnames=true,plainpages=false,pdfpagelabels=true]{hyperref}
-\usepackage[parfill]{parskip}
-\usepackage{lipsum}
-\pagestyle{myheadings}
+\newcommand{\eps}{\varepsilon}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+% Node styles
+\tikzstyle{new style 0}=[fill={rgb,255: red,128; green,128; blue,128},
+draw=black, shape=circle, inner sep=0.5mm]
+\tikzstyle{1}=[fill=white, draw=black, shape=circle, font=\scriptsize,
+        inner sep=0.5mm, outer sep=0.5mm, minimum width=0.5mm]
+% Edge styles
+\tikzstyle{new edge style 0}=[-, draw={rgb,255: red,191; green,191; blue,191}, ultra thin]
+\tikzstyle{new edge style 1}=[-, draw={rgb,255: red,191; green,0; blue,64},
+ultra thick]
+\tikzstyle{new edge style 2}=[-, draw={rgb,255: red,191; green,0; blue,64}, in=60, out=120, dotted]
 
 \usepackage[most]{tcolorbox}
 \tcbuselibrary{skins,breakable}
@@ -53,7 +56,6 @@
     empty,
     title={\textbf{Definition~\thetcbcounter} \textit{#1}},
     attach boxed title to top left,
-    fontupper=\sl,
     boxed title style={
         empty,
         size=minimal,
@@ -96,7 +98,6 @@
     empty,
     title={\textbf{Theorem~\thetcbcounter} \textit{#1}},
     attach boxed title to top left,
-    fontupper=\sl,
     boxed title style={
         empty,
         size=minimal,
@@ -138,7 +139,6 @@
     empty,
     title={Lemma~\thetcbcounter},
     attach boxed title to top left,
-    fontupper=\sl,
     boxed title style={
         empty,
         size=minimal,
@@ -180,7 +180,6 @@
     empty,
     title={\textbf{Proposition~\thetcbcounter}},
     attach boxed title to top left,
-    fontupper=\sl,
     boxed title style={
         empty,
         size=minimal,
@@ -222,7 +221,6 @@
     empty,
     title={\textbf{Proof}~\textit{#1}},
     attach boxed title to top left,
-    fontupper=\sl,
     boxed title style={
         empty,
         size=minimal,
@@ -267,19 +265,37 @@
             }
 }
 
-\newcommand{\eps}{\varepsilon}
-\DeclareMathOperator*{\argmax}{arg\,max}
-\DeclareMathOperator*{\argmin}{arg\,min}
+\titel{N-Cyclic Arbitrage on Constant Function Market Makers}
+\autorIn{{Milutin Popović BSc}}
+\degree{{Master of Science}}
+\degreeshort{{Sc}}
+\jahr{{2025}}
+\studienkennzahl{{UA 066 821}}
+\studienrichtung{{Masterstudium Mathematik}}
+\betreuerIn{{Univ.-Prof. Dr. Radu Ioan Boţ, Privatdoz.}}
+\mitbetreuerIn{}
 
-\usepackage[OT2,T1]{fontenc}
-\DeclareSymbolFont{cyrletters}{OT2}{wncyr}{m}{n}
-\DeclareMathSymbol{\Sha}{\mathalpha}{cyrletters}{"58}
+\begin{document}
 
-\markright{Popović}
+\deckblatt
+\pagenumbering{roman}
+\input{./chapters/abstract.tex}
+\input{./chapters/thanks.tex}
 
-\title{
-    Arbitrage on CFMMs\\
-    Report 5
-}
-\author{Milutin Popovic}
-\date{}
+\selectlanguage{english}
+\tableofcontents
+\newpage
+
+\pagestyle{headings}
+\pagenumbering{arabic}
+
+\input{./chapters/intro.tex}
+\input{./chapters/chapter1.tex}
+\input{./chapters/chapter2.tex}
+\input{./chapters/chapter3.tex}
+\input{./chapters/chapter4.tex}
+
+\nocite{*}
+\printbibliography
+
+\end{document}
