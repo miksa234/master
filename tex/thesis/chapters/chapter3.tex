@@ -1,4 +1,4 @@
-\chapter{Background RL and GNNs}
+\chapter{Reinforcement Learning and Graph Neural Networks (GNNs)}
 \begin{enumerate}
     \item What is RL, MDPs ? (OK)
     \item Policy, value function, state-action value function (OK)
@@ -10,7 +10,7 @@ This chapter is just going to be about the things I gathered relevant for
 solving my problem with Reinforcement learning, the focus is on the things I
 did not know until now. The first milestone would be to apply the AlphaZero
 algorithm on the problem. This means I have to know about Markov Decision
-Process and Monte Carlo Tree search. One of the questions faced is also how
+Process and Monte Carlo Tree (MCTS) search. One of the questions faced is also how
 to encode the state, hence the need to fall back to Graph neural networks
 which utilize edge weights.
 \section{Markov Decision Process}
@@ -259,7 +259,7 @@ where $I$ is the appropriate identity matrix.
 \newline
 
 Proofs for the theorems can be found in \cite[Chapter~17]{ml_foundations}.
-\section{Monte Carlo Tree Search}
+\section{Monte Carlo Tree Search (MCTS)}
 MCTS is a search algorithm for decision processes like MDP. The algorithm
 focuses on finding the most favorable course of action by uniformly expanding
 the search tree at each step and applying random actions/decisions until
@@ -538,7 +538,8 @@ layer is calculated by
     h_{i}^{(k+1)} = g\left( h_i^{(k)},
     \bigoplus_{j\in\mathcal{N}_i}\alpha_{ij}^{(k)}h_j^{(k)} \right)
 \end{align}
-\section{AlphaZero}
+\section{REINFORCE}
+TODO
 The section is a brief overview of how AlphaZero \cite{alphazero} works. The
 special thing about AlphaZero is that it uses purely reinforcement learning
 to optimize the policy and there is are is no outside data fed in. There are
@@ -591,6 +592,8 @@ softmax activation function to output $p$.
 [TODO: mb picture here for the architecture]
 
 \section{Application to Problem}
+TODO: Move to next section remove NP-hard
+
 The problem finding a path starting and ending at the same node with no
 repeated edges which minimizes the weights is an NP-hard because it is a case
 of a traveling salesman problem (TSV). As a first exploration step AlphaZero

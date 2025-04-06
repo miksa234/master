@@ -1,4 +1,4 @@
-\chapter{Background Optimization}
+\chapter{Background on Nonlinear Optimization}
 In this chapter we will go through the necessary background to understand
 optimality conditions for nonlinear constrained optimization problems. We
 will introduce necessary optimality conditions. In the case we have a \"nice
@@ -380,7 +380,7 @@ about the objective function $f$ and gives a very nice result.
 g(x^{*}) \le 0$. Also by construction of the problem $h_j(x)=0$ for all
 $j=1,\ldots,p$.
 \end{proof}
-\section{Convex Optimization Problems}
+\section{Convex Case}
 Since Abadie CQ is an excellent result since it gives a hint how to find
 $x^{*}$. But it assumes something about $x^{*}$ before it is even found. In
 the case of convex optimization problems we can derive a much relaxed
@@ -528,9 +528,68 @@ We show that $x^{*}$ fulfills Abadie CQ, i.e. $T_{\text{lin}}(x^{*})
 \begin{align}
     \nabla g_i(x^{*})^{T} d'
     &= \nabla g_i(x^{*})^{T} (x^{*} + d' - x^{*} )\\
-    &= g_i(x^{*} +d') -g_i(x^{*})
-
+    &\le g_i(x^{*} +d') -g_i(x^{*}) < 0,
 \end{align}
+where $g(x') < 0$ by Slater CQ and $g_i(x^{*}) = 0$ for all active indices
+which we considered. Also
+\begin{align}
+    Ad' = Ax' - Ax^{*} = b - b = 0.
+\end{align}
+Let $d(\tau) = d+ \tau d'$ for all $\tau >0$, note that $d = \lim_{\tau \to
+0}d(\tau)$. Then we have
+\begin{align}
+    \nabla g_i(x^{*})^{T} d(\tau)
+    &= \nabla g_i (x^{*})^{T} d + \tau \nabla g_i(x^{*})^{T} d' < 0,
+\end{align}
+for all $i \in \mathcal{A}(x^{*})$ and
+\begin{align}
+    Ad(\tau) = Ad + \tau Ad' = 0.
+\end{align}
+We can show that $d(\tau) \in T_X(x^{*})$ for all $\tau >0 $, which concludes
+the proof by the closure of $T_X(x^{*})$. Let
+\begin{align}
+    x^{k}  = x^{*} + \frac{1}{k}d(\tau),\\
+    t_k = 1/k,
+\end{align}
+for $k \in \mathbb{N}$. This gives
+\begin{align}
+    \frac{x^{k} - x^{*}  }{t_k} = d(\tau)
+\end{align}
+To finish the proof, we need to show that $x^{k}  \in X$, the feasible set,
+i.e. we show that $g_i(x^{k}) \le 0$ for all $i=1,\ldots,m$ and $Ax^{k} -b =
+0$ for all $k$ large enough. Indeed for all $i \in \mathcal{A}(x^{*})$ by the
+Mean Value Theorem, we can find for each $k\ge 1$ a $\xi^{k}$ in the line
+segment of $x^{*}$ and $x^{k}$ sucht that
+\begin{align}
+    g_i(x^{k})
+    &= g_i(x^{k}) - g_i(x^{*}) \\
+    &= \nabla g_i(\xi^{k})^{T} (x^{k} -x^{*} ) \\
+    &= \frac{1}{k} \nabla g_i (\xi^{k})^{T} d(\tau).
+\end{align}
+Thus there is a $k^i_0\ge1$ such that
+\begin{align}
+    kg_i(x^{k}) < 0 \quad \forall k \ge k_0^{i},
+\end{align}
+and therefore
+\begin{align}
+    g_i(x^{k}) < 0 \quad \forall k \ge k_0^{i},
+\end{align}
+For $i \in \mathcal{I}(x^{*})$, by definition $g_i(x^{*}) < 0$ and $x^{k} \to
+x^{*}$ by letting $k$ go to infinity, i.e.
+\begin{align}
+    \lim_{k \to \infty} g_i(x^{k}) = g_i (x^{*}) < 0.
+\end{align}
+So there is a $k_1^{i} \ge 1$ such that
+\begin{align}
+    g_i(x^{k}) < 0 \quad \forall k \ge k_1^{i}.
+\end{align}
+Taking $k_0 = \max{k_0^{i} , k_1^{i}}$ over all indices $i = 1,\ldots,m$
+shows the first part. Lastly
+\begin{align}
+    Ax^{k} = A x^{*}  + \frac{1}{k}Ad(\tau) = b,
+\end{align}
+since $x^{*} \in X$ and $Ad(\tau) = 0$. This shows $d(\tau) \in T_X(x^{*})$
+and by continuity $d \in T_X(x^{*})$.
 \end{proof}
 Thus Salter CQ implies Abadie CQ and we can show that KKT optimality
 conditions are sufficient for optimality
@@ -540,7 +599,32 @@ conditions are sufficient for optimality
     \ref{eq: convex_constrained}.
 \end{theorem}
 \begin{proof}
-TODO
+    Since $x^{*} \in X$ and $(x^{*}, \lambda^{*}, \mu^{*})$ a KKT point of
+    \ref{eq: convex_constrained} and by Proposition \ref{prop: convexity} (2)
+    we have
+    \begin{align}
+        f(x)
+        &\ge f(x^{*}) + \nabla f(x^{*})^{T}(x-x^{*})\\
+        &= f(x^{*}) + \left(
+        -\sum_{i=1}^{m} \lambda_i^{*}\nabla g_i(x^{*})^{T}
+        -\sum_{j=1}^{p} \mu_j^{*} a_j^{T}
+    \right)(x-x^{*})\\
+        &= f(x^{*}) -
+        -\sum_{i\in\mathcal{A}(x^{*})}^{m} \lambda_i^{*}\nabla g_i(x^{*})^{T}
+    (x-x^{*}),
+    \end{align}
+    where $a_j$ is the $j$-th row of $A$. Using the convexity of $g$ and the
+    contraint of $g(x) \le 0$ we get
+    \begin{align}
+        f(x)
+        &\ge f(x^{*})
+        -\sum_{i\in\mathcal{A}(x^{*})}^{m} \lambda_i^{*}
+        \left( g_i(x) -g_i(x^{*})  \right)\\
+        &= f(x^{*})
+        -\sum_{i\in\mathcal{A}(x^{*})}^{m} \lambda_i^{*}
+        g_i(x)\\
+        &\ge f(x^{*}).
+    \end{align}
 \end{proof}
 
 
