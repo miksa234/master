@@ -49,10 +49,10 @@ ultra thick]
 \usepackage[most]{tcolorbox}
 \tcbuselibrary{skins,breakable}
 \colorlet{colexam}{black}
-\numberwithin{equation}{subsection}
+\numberwithin{equation}{chapter}
 
 \newcounter{definition}
-\newtcolorbox[use counter=definition, number within=subsection]{definition}[1][]{
+\newtcolorbox[use counter=definition, number within=chapter]{definition}[1][]{
     empty,
     title={\textbf{Definition~\thetcbcounter} \textit{#1}},
     attach boxed title to top left,
@@ -71,7 +71,7 @@ ultra thick]
             parbox=false,
             boxsep=-1pt,
             left=0.75cm,
-            right=3mm,
+            right=0mm,
             top=4pt,
             breakable,
             pad at break*=0mm,
@@ -94,7 +94,7 @@ ultra thick]
 }
 
 \newcounter{theorem}
-\newtcolorbox[use counter=theorem, number within=subsection]{theorem}[1][]{
+\newtcolorbox[use counter=theorem, number within=chapter]{theorem}[1][]{
     empty,
     title={\textbf{Theorem~\thetcbcounter} \textit{#1}},
     attach boxed title to top left,
@@ -113,7 +113,7 @@ ultra thick]
             parbox=false,
             boxsep=-1pt,
             left=0.75cm,
-            right=3mm,
+            right=0mm,
             top=4pt,
             breakable,
             pad at break*=0mm,
@@ -134,10 +134,11 @@ ultra thick]
                 west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
                 --([xshift=0.6cm]frame.south west)--([xshift=-13cm]frame.south east); }
 }
+
 \newcounter{lemma}
-\newtcolorbox[use counter=lemma, number within=subsection]{lemma}{
+\newtcolorbox[use counter=lemma, number within=chapter]{lemma}[1][]{
     empty,
-    title={Lemma~\thetcbcounter},
+    title={\textbf{Lemma~\thetcbcounter} \textit{#1}},
     attach boxed title to top left,
     boxed title style={
         empty,
@@ -149,12 +150,12 @@ ultra thick]
             {\draw[colexam,line width=1pt]([yshift=-0.35cm]frame.north
         west)--([yshift=-0.35cm]frame.north east);}},
             coltitle=colexam,
-            fonttitle=\bfseries,
+            fonttitle=\normalfont,
             before=\par\medskip\noindent,
             parbox=false,
             boxsep=-1pt,
             left=0.75cm,
-            right=3mm,
+            right=0mm,
             top=4pt,
             breakable,
             pad at break*=0mm,
@@ -175,8 +176,9 @@ ultra thick]
                 west)--([xshift=0.6cm,yshift=-1pt]frame.north west)
                 --([xshift=0.6cm]frame.south west)--([xshift=-13cm]frame.south east); }
 }
+
 \newcounter{proposition}
-\newtcolorbox[use counter=proposition, number within=subsection]{proposition}{
+\newtcolorbox[use counter=proposition, number within=chapter]{proposition}{
     empty,
     title={\textbf{Proposition~\thetcbcounter}},
     attach boxed title to top left,
@@ -195,7 +197,7 @@ ultra thick]
             parbox=false,
             boxsep=-1pt,
             left=0.75cm,
-            right=3mm,
+            right=0mm,
             top=4pt,
             breakable,
             pad at break*=0mm,
@@ -236,7 +238,7 @@ ultra thick]
             parbox=false,
             boxsep=-1pt,
             left=0.75cm,
-            right=3mm,
+            right=0mm,
             top=4pt,
             breakable,
             pad at break*=0mm,
