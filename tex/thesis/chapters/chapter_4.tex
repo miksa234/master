@@ -6,34 +6,36 @@
     \item MCTS based methods (model based methods) (OK)
     \item Reinforce algorithm with/without baseline approximations (TODO)
 \end{enumerate}
-This chapter is just going to be about the things I gathered relevant for
-solving my problem with Reinforcement learning, the focus is on the things I
-did not know until now. The first milestone would be to apply the AlphaZero
-algorithm on the problem. This means I have to know about Markov Decision
-Process and Monte Carlo Tree (MCTS) search. One of the questions faced is also how
-to encode the state, hence the need to fall back to Graph neural networks
-which utilize edge weights.
+In this chapter we introduce the framework on which the quasioptimal solution
+of finding the arbitrage walk is going to be based on. We are going to give a
+brief introduction to Monte Carlo based Reinforcement Learning which we will
+apply based on a model of the environment of a network of CFMM. This chapter
+is largely based on \cite[Chapter17]{ml_foundations} for the foundations of
+Reinforcement Learning and \cite{sutton_barto} for the REINFORCE based MCTS
+algorithm.
 \section{Markov Decision Process}
-In comparison with supervised learning, reinforcement learning is not fed
-directly with labeled data, instead it learns through an agent which takes
-actions and is rewarded based on the outcome of these actions. Hence, this
-method is better suited for graph based problems and learning games, where a
-decision needs to be made based on the environment. In these cases the
-combinatorial complexity of the game is too big, such that supervised
+Generally in comparison to supervised learning, reinforcement learning is not
+trained directly with labeled data, instead it learns through an agent which takes
+actions and is rewarded based on the outcome of these actions. The idea is
+to, in expectation, increase the rewards of the agent throughout the learning
+process by `trial and error'. Hence, reinforcement learning
+is better suited for problems with large solution spaces and decision making
+setting, where we have dynamical environments. In these cases the
+combinatorial complexity of these problems is too big, such that supervised
 learning would lack labeled data. For instance the Shannon number is
 $10^{120}$, which is the lower bound of all possible positions in chess.
 In this chapter we will go through the foundation of reinforcement learning
-based no \cite[Chapter~17]{ml_foundations}.
+based on \cite[Chapter~17]{ml_foundations}.
 
-The general learning scenario is based on the agent collecting information
-through actions, interacting with the environment. In response to an action
-the agent will enter a new state and will be given a reward depending on the
-general goal \ref{fig: 1}. For example the action that wins a decision wining game, the
-agent will get a reward of $+1$. The agents objective is to maximize the
-reward and by doing this determines the best curs of action at a given
-state, called the policy.
-
-\begin{figure}[ht!]
+The general the learning scenario is based on the agent collecting
+information through actions, interacting with the environment. In response to
+an action the agent will enter a new state and will be given a reward
+depending on the general goal \ref{fig: 1}. For example the agent is rewarded
+a score value of $+1$ if set of actions leads to a win in a decision based
+game. At each state the agents objective is to maximize the expected reward,
+which translates to taking in expectation the best action at a given state,
+called the policy.
+\begin{figure}[H]
     \centering
     \begin{tikzpicture}
 
@@ -53,27 +55,23 @@ state, called the policy.
 \end{figure}
 
 At each step the agent faces a decision to choose an action leading to a new
-state and the reward associated with it. Thereby the agent faces a dilemma in
-this choice based on the previous experience with the state and action,
-should the agent choose to export this information about the environment \&
-states and optimize for the reward or should the agent explore other unknown
-states potentially leading to a more favorable outcome. In reinforcement
-learning this is called "exploration versus exploitation trade off.
+state and collect reward associated with it. Yet the agent is faced with a
+dilemma of whether to maybe choose an action to an unexplored state which
+would potentially lead to a higher reward or stick with an already
+known-to-work set of actions. In reinforcement learning this is called
+`exploration versus exploitation' trade off and is manifested and controlled
+in the scope of the learning algorithm.
 
 Also, a key difference to traditional supervised learning, reinforcement
 learning does not sample features based on a fixed distribution. Essentially
 the training and testing phases are not separated, but rather combined in
-each step.
-\newline
-
-The two main learning settings are distinguished, the setting where the
-full environmental model is known and unknown.
-
-The mathematical model which describes the agent's iteration with the
-environment is the Markov decision process (MPD).
+each step. The two main learning settings are distinguished, the setting
+where the full environmental model is known and the one where the
+environmental model is unknown. The mathematical model which describes the
+agent's iteration with the environment is called the Markov Decision Process (MPD).
 \begin{definition}[Markov decision process]
-    The MDP is defined by 4 tuple $(S, A, \delta, R_a)$:
-    \begin{itemize}
+    The MDP is defined by $4$ tuple $(S, A, \delta, R_a)$:
+    \begin{itemize}[nosep]
         \item The set of all states $S$, with a start state $s_0 \in S$,
         \item The set of all actions $A$,
         \item The transition probability $\mathbb{P}[s'|s, a] = \int_{S'}
@@ -83,14 +81,16 @@ environment is the Markov decision process (MPD).
     \end{itemize}
 \end{definition}
 The transition probability $\mathbb{P}[s'|s, a]$ describes the probability of
-the agent landing in state $s'$, when he is initially at state $s$ and takes
-an action $a$. Similarity the reward probability is explained in the same way. The
-structure of this state transition only depends on the last state and the
+the agent landing in state $s'$, when being initially at state $s$ and takes
+an action $a$. Similarity the reward probability is explained in the same
+way. The structure of state transition only depends on the last state and the
 action taken and not on the whole history of states and actions hence the
-Markov property and the naming of the model. Usually the state transitions and
-rewards are deterministic, in this case the transition and reward probability
-is $1$ and the MDP is called \textbf{deterministic} and the reward is $r(s, a)$.
-\begin{figure}[ht!]
+Markov property and the naming of the model. Usually and in our case, the
+state transitions and rewards are deterministic, in this case the transition
+and reward probability is $1$ and the MDP is called deterministic with the
+reward being $r(s, a)$.
+\newpage
+\begin{figure}[H]
     \centering
     \begin{tikzpicture}
 
@@ -112,21 +112,21 @@ is $1$ and the MDP is called \textbf{deterministic} and the reward is $r(s, a)$.
     \caption{Deterministic discrete MDP \label{fig: 2} \cite{ml_foundations}}
     \label{}
 \end{figure}
-In the discrete model the agent will preform actions in a set of decision
-epochs $t \in {0,\ldots,T}$ \ref{fig: 2}, this is the usual model adopted for a wide range
-of problems. The MDP is called \textbf{finite} when both $S$ and $A$ are
-finite sets. Furthermore, the MDP has a \textbf{finite time horizon} when $T$
-is finite.
+As per the discrete model, the agent preforms actions throughout a set of
+decision epochs $t \in {0,\ldots,T}$ \ref{fig: 2}. This is the usual model
+adopted for a wide range of problems. The MDP is called finite when both $S$
+and $A$ are finite sets. Furthermore, the MDP has a finite time horizon when
+$T$ is finite.
 \newline
-
-The goal for the agent in an MPD is to find a good policy for the decision.
-The policy is a function, which given a state returns a probability
-distribution over the possible actions from the given state. The choice is
-then the action with the highest probability.
+Generally we would like to find a to find a good policy for the decisions,
+i.e. probabilities at each state telling us which action to take. The policy
+is a function of states and returns a probability distribution over
+the possible actions from the given state. We choose the action with the
+higher probability in the probability distribution given by the policy.
 \begin{definition}[Policy]
     A policy is a mapping $\pi : S \to \Delta\left( A \right)$, where $S$ is
     the state space and $\Delta(A)$ is the set of probability distributions
-    over A.
+    over A, the action space.
     \newline
 
     We call the policy deterministic if:
@@ -136,18 +136,16 @@ then the action with the highest probability.
     In this case we have $\text{im}(\pi) = A$, and we can say $\pi: S \to A$ with
     $\pi(s) = a$.
 \end{definition}
-With the definition of a policy, the aim of the agent can be expressed as
-trying to find a policy that maximizes the total return. For a discrete
-policy the total return is
+Together with the definition of a policy, the aim of the agent can be
+expressed as trying to find a policy that maximizes the total in
+return in expectation. For a discrete policy the total return is
 \begin{align}
     &\sum_{t=0}^{T} r(s_t, \pi(s_t)) & \text{finite horizon}\\
     &\sum_{t=0}^{\infty}\gamma^{t} r(s_t, \pi(s_t)) & \text{infinite horizon}
 \end{align}
 where $r(s_t, \pi(s_t))$ is the reward function for the next state and
-$\gamma \in [0, 1)$ a discount factor for future rewards.
-\newline
-To quantify what is the optimal policy, it is natural to define the value of the
-policy at a given state.
+$\gamma \in [0, 1)$ a discount factor for future rewards. To quantify what
+the optimal policy is, we define the value of the policy at a given state.
 \begin{definition}[Policy value]
     The value $V_\pi(s)$ of the policy $\pi$ at state $s \in S$ is defined as
     the expected value of the total reward over the policy distribution
@@ -164,7 +162,7 @@ policy at a given state.
         a_t) \Bigg| s_0 = s \right].
     \end{align}
 \end{definition}
-Thereby the optimal policy can be defined in the following way
+Thereby the optimal policy can be defined in a standard way
 \begin{definition}[Optimal policy]
     The policy $\pi^{*}$ is called optimal if for any policy $\pi$ it
     holds that
@@ -172,11 +170,11 @@ Thereby the optimal policy can be defined in the following way
         V_{\pi^{*}}(s) \ge V_\pi(s) \quad \forall s \in S.
     \end{align}
 \end{definition}
-Similarly to the policy value we can give the pair $(s, a)$ associated to a
-policy $\pi$ a value, the so called state-action value
+Similarly to the policy value we can quantify the pair $(s, a)$ associated to a
+policy $\pi$ by a value, the so called state-action value
 \begin{definition}[State-action value]
     The state-action value function $Q_\pi$ associated with a policy $\pi$ is
-    defined on all pairs state-action pairs $(s, a) \in S \times A$
+    defined on all state-action pairs $(s, a) \in S \times A$
     \begin{align}
         Q_\pi(s, a) &= \mathbb{E}[r(s,a)]
         \mathbb{E}_{a_t\sim\pi(s_t)}\left[ \sum_{t=1}^{\infty}\gamma^{t}
@@ -185,14 +183,14 @@ policy $\pi$ a value, the so called state-action value
             &= \mathbb{E}\left[r(s,a) + \gamma V_\pi(s_1)\Big| \;s_0=s,\;
             a_0=a   \right].
     \end{align}
-    Note that the expected value of the state-value function at $(s, a)$ over the policy
-    distribution at state $s$ is the policy value at $s$, i.e.
-    \begin{align}
-        \mathbb{E}_{a\sim\pi(s)}\left[Q_\pi(s, a)\right] = V_\pi(s).
-    \end{align}
 \end{definition}
-With the help of these definitions it can be shown that for any MDP there is
-a deterministic optimal policy.
+Note that the expected value of the state-value function at $(s, a)$ over the policy
+distribution at state $s$ is the policy value at $s$, i.e.
+\begin{align}
+    \mathbb{E}_{a\sim\pi(s)}\left[Q_\pi(s, a)\right] = V_\pi(s).
+\end{align}
+Now that the framework for is set we can show that there exists an optimal
+policy
 \begin{theorem}[Policy Improvement Theorem]
     For any two policies $\pi'$ and $\pi$, it holds that
     \begin{align}
@@ -213,9 +211,9 @@ a deterministic optimal policy.
 \begin{theorem}{Existence of optimal deterministic policy}
     Any finite MDP has an optimal deterministic policy.
 \end{theorem}
-Consider an optimal deterministic policy $\pi^{*}$ with its policy value and
+Now we consider an optimal deterministic policy $\pi^{*}$ with its policy value and
 state-action value functions $V^{*}$ and $Q^{*}$. The optimal policy for all
-state is
+states is
 \begin{align}
     \pi^{*}(s) = \argmax_{a \in A} Q^{*}(s,a).
 \end{align}
@@ -237,7 +235,7 @@ equations called \textit{Bellman equations}:
         \mathbb{P}[s'|s, \pi(s)] V^{*}(s') \quad \forall s \in S.
     \end{align}
 \end{theorem}
-We can rewrite the linear system
+We can rewrite the linear system to
 \begin{align}
     v = \gamma P v + r,
 \end{align}
@@ -264,25 +262,26 @@ MCTS is a search algorithm for decision processes like MDP. The algorithm
 focuses on finding the most favorable course of action by uniformly expanding
 the search tree at each step and applying random actions/decisions until
 reaching a terminal state, this outcome is then communicated back to the
-start (backpropagation). In the last decade MCTS has been combined
-with learning based methods \cite{alphazero} to produce agents which can beat
-humans in Chess, GO and other games.
+start via backpropagation. In the last decade MCTS has been combined with
+learning based methods like AlphaZero \cite{alphazero} to produce agents
+which can beat humans in Chess, GO and other games.
 \newline
 
-On a basic level the fundamental concept of the algorithm is that the true
-value of an action can be approximated by random simulation, which ultimately
+On a basic level the concept of the algorithm based on approximating the true
+value of an action through random simulation, which ultimately
 adjusts the policy efficiently to derive a best-first strategy
-\cite{mcts_survey}. One search iteration is done in four steps:
+\cite{mcts_survey}. One search iteration is divided into four steps:
 \newline
 
-\textbf{1. Selection Phase:} Also called Tree-Traversal Phase, starts at the
-root node state and walks down until reaching a leaf node state with a
-selection policy. The leaf node state is one that is not yet fully expanded,
-i.e. has unvisited children or is not a terminal state. The selection policy of
-the walk is done through the confidence bound ($UCB1$), where the idea
-is to weight out and balance the exploration vs exploitation. The next action
-is chosen such that the next node has the biggest $UCB1$ value. The basic
-$UCB1$ formula is
+\textbf{1. Selection Phase:} Also called the Tree-Traversal Phase. Here we
+start at the root node state and walk down until reaching a leaf node state
+with a selection policy. The leaf node state is a state which is not yet
+fully expanded, meaning it has children that are not visited or it is not a
+terminal state. The selection policy of the walk is based on the upper
+confidence bound ($UCB1$). The idea is to weight out and balance the
+`exploration vs exploitation" trade-off. We select an action, leading to then
+next node state, which has the biggest $UCB1$ value. The standard $UCB1$
+\cite{sutton_barto} formula is
 \begin{align}
     UCB1 = \frac{w_i}{n_i} + C \sqrt{\frac{\ln N_i}{n_i}},
 \end{align}
@@ -291,20 +290,20 @@ the node, $N_i$ the number of visits of the parent node and $C\in R$ is a
 constant, usually chosen to be $C = \sqrt{2}$
 \newline
 
-\textbf{2. Node Expansion Phase:} An extra node is added into the tree according
-to the available actions, if the node state is not a terminal one.
+\textbf{2. Node Expansion Phase:} If the node state is not a terminal one, an
+extra node is added into the search tree according to the available actions.
 \newline
 
-\textbf{3. Simulation Phase}: Also called Roll-out state. A simulation/roll-out
-is from the current node selecting actions randomly until a terminal node
-state.
+\textbf{3. Simulation Phase}: Also called the Roll-out state. A
+simulation/roll-out evolves around the current node selecting actions
+randomly until a terminal node state.
 \newline
 
 \textbf{4. Backpropagation Phase:} The result of the simulation is used to
 update the information in the nodes traversed, such as the outcome/reward of
 the terminal state at the end of the simulation and also the visit count of
 the nodes.
-\begin{figure}[htb!]
+\begin{figure}[H]
     \centering
     \begin{tikzpicture}[scale=0.8, transform shape]
         \node[align=center, ellipse, draw, ultra thick] (0)  {Start};
@@ -347,7 +346,6 @@ the nodes.
     \end{tikzpicture}
     \caption{MCTS algorithmic diagram \label{fig: 3}}
 \end{figure}
-
 The general algorithmic structure is described in \cite{mcts_survey}, denoted
 in \ref{alg: 1}. For clarity purposes the diagram of the algorithm is in
 \ref{fig: 3}.
@@ -369,29 +367,35 @@ biggest $UCB1$ value. The state $s_k$ is reached after the selection phase
 and the expansion, upon which a simulation is run giving the terminal
 result/outcome $w$. The outcome is then communicated back from $s_k$ back to the
 root node in the path taken to reach $s_k$ from the root node. At the end the
-algorithm returns then the  action $a$ leading to the best child of $s_0$.
+algorithm returns the  action $a$ leading to the best child of $s_0$.
 The number of search iterations is usually indicated by a specific search
 time or number of search steps given and is denoted by the while statement.
+\newline
+The MCTS algorithm is a very diverse algorithm in the sence that it allows
+for a wide array of variations and improvements, from changing the selection
+policy to droping one of the four basics steps and utilizing
+learning parameters.
 
 \section{Graph Neural Networks \label{sec: gnn}}
-This section is an introductory the Graph Neural Networks (GNNs)
-\cite{gnn_overview}. GNNs are Neural Networks (NNs) which operate over graph
-structured data. Let further denote a graph as a tuple $(E, V)$, where $E$
-are edges and $V$ are the nodes of the graph. Also let $A$ be the adjacency
-matrix of the graph, where $a_{ij} = 1$ if $(i, j) \in E$ and $a_{ij} =0$
-otherwise. Finally, denote $X$ to be the node features.
+In this section we go through an overview of the later used the Graph Neural
+Networks (GNNs) \cite{gnn_overview}. GNNs are Neural Networks (NNs) which
+operate over graph structured data. Let us further denote a graph as a tuple
+$(E, V)$, where $E$ are edges and $V$ are the nodes of the graph. Also let
+$A$ be the adjacency matrix of the graph, where $a_{ij} = 1$ if $(i, j) \in
+E$ and $a_{ij} =0$ otherwise. Finally, we denote $X$ to be the set of node
+feature.
 \newline
 
 There are multiple types of GNNs some more complex than others
-\cite{gnn_overview}, but the core principles are taken from convolutional
-NNs. An image can be seen as a grid graph, where each node corresponds to a
-pixel and is connected to its neighboring pixels. Simple convolution in
-images aggregates pixel by applying a simple operation (kernel) on its
-neighborhood, updating the pixels value. Similarly, in a graph the
-convolutional GNN will take the information of the neighboring node features
-(and edge features) to update the underlying node by applying some function
-on them \ref{fig: 4}.
-\begin{figure}[htb!]
+\cite{gnn_overview}, but the core principles are taken from the foundational
+convolutional NNs. An image can be seen as a grid graph, where each node
+corresponds to a pixel and is connected to its neighboring pixels. Simple
+convolution in images aggregates pixel by applying a simple operation
+(kernel) on its neighborhood, updating the pixels value. Similarly, in a
+graph the convolutional GNN will take the information of the neighboring node
+features (and edge features) to update the underlying node by applying some
+function/transformation on them \ref{fig: 4}.
+\begin{figure}[H]
     \centering
     \begin{tikzpicture}
             \node [style=new style 0] (6) at (3.25, 1) {};
@@ -457,7 +461,7 @@ The features of the 1-hop neighborhood $\mathcal{N}_i$ of the node are
 \end{align}
 Then the convolutional function $g$ operates on the features of the node
 itself and on the features of its 1-hop neighborhood $g\left(x_i,
-X_{\mathcal{N}_i}\right)$. Suitable functions that preserve the invariance
+X_{\mathcal{N}_i}\right)$. Suitable are functions that preserve the invariance
 or equivariance of the graph. When applying a permutation matrix $P$ we need
 to permute the rows and the columns of the adjacency matrix $A$, which
 results to $PAP^{T}$, leading to functions satisfying
@@ -475,35 +479,30 @@ get
         g(x_n, X_{\mathcal{N}_n})
     \end{bmatrix},
 \end{align}
-thus $g$ needs to be permutation invariant, to not depend on the order in
-$X_{\mathcal{N}_i}$ and thereby $f$ will be equivariant. Conventionally the
-local function $g$ is referred to as "`diffusion"' , "`propagation"' or
-"`message passing"'
-and the global function $f$ as a "`GNN Layer"' \cite[Chapter~5]{gnn_overview}.
-The majority of the GNN Layer types can be
-differentiated by three types, \textit{Convolutional}, \textit{Attentional}
+thus $g$ needs to be permutation invariant and not depend on the order in
+$X_{\mathcal{N}_i}$. Then $f$ will be equivariant. Conventionally the local
+function $g$ is referred to as `diffusion' , `propagation' or `message
+passing' and the global function $f$ as a `GNN Layer'
+\cite[Chapter~5]{gnn_overview}. The majority of the GNN Layer types can be
+distinguished into three types, \textit{Convolutional}, \textit{Attentional}
 and \textit{Message-passing} GNN. They are all different in the sense how $g$
-incorporates the neighboring features, where $g$ needs to be permutation
-invariant.
+incorporates the neighboring features.
 \newline
-
 The convolutional type \cite[Chapter~5]{gnn_overview} as described above for
 clarification, the features of the neighbors are aggregated additionally with
 fixed weights $c_{ij}$ after applying some function $\psi$ on them
 \begin{align}
     x_i' = g\left( x_i, \bigoplus_{j\in \mathcal{N}_i} c_{ij} \psi(x_j) \right).
 \end{align}
-
-In attention type \cite{gan_velickovic} features of neighbors are applied
-with implicit weights, via attention. The attention coefficient for each
+The attention type \cite{gan_velickovic} we use features of neighbors to
+apply implicit weights, via attention. The attention coefficient for each
 pair is computed via a function $\alpha_{ij} = a(x_i, x_j)$, usually a
 softmax function resulting in
 \begin{align}
     x_i' = g\left( x_i, \bigoplus_{j\in \mathcal{N}_i} a(x_i, x_j) \psi(x_j) \right).
 \end{align}
-
 The message passing type \cite[Chapter~5]{gnn_overview} computes arbitrary
-vector "`messages"', these are then sent through the edges back to the
+vectors `messages', these are then sent through the edges back to the
 original node which gives
 \begin{align}
     x_i' = g\left( x_i, \bigoplus_{j\in \mathcal{N}_i} \psi(x_i, x_j) \right).
@@ -528,18 +527,19 @@ where
 \begin{align}
     e_{ij}^{(k)} = \text{MLP}^{k}\left(h_i^{(k)} \| h_j^{(k)} \| w_{ij}\right).
 \end{align}
-Here $\|$ is the concatenation operator,  $w_{ij}$ is the weight
-of the edge, $\text{MLP}^{k}$ is a $k$-th layer multilayer perceptron, where
-the last weight can produce negative values, $h_i^{(k)}$ and $h_j^{(k)}$ is
-the node feature embeddings after the $k$-th GNN layer. The input features
-are in the 0-th layer $h_i^{(0)} = x_i$. Then the node embedding for the next
-layer is calculated by
+Here $\|$ is the concatenation operator,  $w_{ij}$ is the weight of the edge
+(or edge attribute), $\text{MLP}^{k}$ is a $k$-th layer multilayer
+perceptron, where the last weight can produce negative values, $h_i^{(k)}$
+and $h_j^{(k)}$ is the node feature embeddings after the $k$-th GNN layer.
+The input features are in the 0-th layer $h_i^{(0)} = x_i$. Then the node
+embedding for the next layer is calculated by
 \begin{align}
     h_{i}^{(k+1)} = g\left( h_i^{(k)},
     \bigoplus_{j\in\mathcal{N}_i}\alpha_{ij}^{(k)}h_j^{(k)} \right)
 \end{align}
 \section{REINFORCE}
 TODO
+\section{AlphaZero}
 The section is a brief overview of how AlphaZero \cite{alphazero} works. The
 special thing about AlphaZero is that it uses purely reinforcement learning
 to optimize the policy and there is are is no outside data fed in. There are
@@ -549,7 +549,7 @@ gathers information about the environment and gathers the data. In the second
 phase the information of the self play part is used to optimize the model and
 then AlphaZero plays with the optimized model against itself again, forming a
 loop \ref{fig: 5}.
-\begin{figure}[htb!]
+\begin{figure}[H]
     \centering
     \begin{tikzpicture}
         \node[font=\bfseries] (0) {SelfPlay};
@@ -589,7 +589,6 @@ simple $19x19$ board. The encoded state is passed residual neural network
 where the output is split into a value head neural network with zero-centered
 activation function to produce $v$ and a policy head neural network with
 softmax activation function to output $p$.
-[TODO: mb picture here for the architecture]
 
 \section{Application to Problem}
 TODO: Move to next section remove NP-hard
@@ -607,7 +606,7 @@ not yet been traversed. The state could be the path the agent is currently
 taking, i.e. a sequence of nodes $s = \left\{ v_0,v_1,\ldots \right\}$. Upon
 arrival of the terminal state, which is either a circuit or a dead end the
 reward $R$ must be assigned correspondingly. It makes sence to keep a track
-of the agents "`score"', such that the model will try to find the path with the
+of the agents `score', such that the model will try to find the path with the
 highest score. The score should be higher based on the sum of the weights and
 the number of actions taken. . The agent should be punished with a negative
 reward upon ending up at a terminal state which is not the desired circuit,
