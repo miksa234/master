@@ -304,6 +304,7 @@ $\lambda>0$ does not change the outcome of the equalities and inequalities.
 
 Next we will introduce the KKT conditions
 \begin{definition}
+    \label{def: KKT}
     The function $L: \mathbb{R}^{n} \times \mathbb{R}^{m} \times
     \mathbb{R}^{p} \to \mathbb{R}$ defined as
     \begin{align}
@@ -425,7 +426,7 @@ An important result we will use throughout is the following.
     \begin{align}
         \nabla f(y)^{T} (x-y) \le f(x) - f(y).
     \end{align}
-For (2) $\Rightarrow$ (1), we know that $U$ is convex hence fix $x, y \in U$
+For (2) $\Rightarrow$ (1) we know that $U$ is convex hence fix $x, y \in U$
 then for any $z$ in the line segment of $x$ and $y$ there is a $\lambda \in
 [0,1]$ such that $z = \lambda x + (1-\lambda)y$. We can construct two
 inequalities
@@ -443,7 +444,7 @@ Inserting for $z$ we get $\lambda x+ (1-\lambda)y - z =0$ and thus
 \begin{align}
     f(z) = f(\lambda x + (1-\lambda)y) \le \lambda f(x) + (1-\lambda)f(y).
 \end{align}
-For (2) $\Rightarrow$ (3) consider two inequalities for all $x, y \in U$
+For (2) $\Rightarrow$ (3) we consider two inequalities for all $x, y \in U$
 \begin{align}
     \nabla f(x)^{T} (y-x) \le f(y) - f(x) \\
     \nabla f(y)^{T} (x-y) \le f(x) - f(y).
@@ -452,7 +453,7 @@ Adding them together gives
 \begin{align}
     (\nabla f(x) - \nabla f(y))^{T} (x-y) \le 0 .
 \end{align}
-For (3) $\Rightarrow$ (2) consider a function $g(t) = f(t x + (1-t)y)$
+For (3) $\Rightarrow$ (2) we consider a function $g(t) = f(t x + (1-t)y)$
 defined on the line segment of $x, y \in U$ for $t \in [0, 1]$ and
 well-defined since $U$ is convex. The derivative is
 \begin{align}
@@ -462,14 +463,14 @@ Note that by (3) we have that
 \begin{align}
     \nabla f(x)^{T} (y-x) \le \nabla f(y)^{T} (y-x),
 \end{align}
-for all $x, y \in U$. Now consider the Mean Value theorem for $g$,
+for all $x, y \in U$. Now we use the Mean Value theorem for $g$,
 \begin{align}
     f(y) - f(x) &= \int_0^1 g'(t) dt\\
                 &= \int_0^1 \nabla f(tx +(1-t)y)(y-x)dt\\
                 &\ge \int_0^1 \nabla f(x)(y-x) dt\\
                 &= \nabla f(x) (y-x).
 \end{align}
-Lastly for (2) $\Leftrightarrow$ (4) use Taylor's Theorem, i.e. for all $x, y
+Lastly for (2) $\Leftrightarrow$ (4) we use Taylor's Theorem, i.e. for all $x, y
 \in X$ we have
 \begin{align}
     f(y) = f(x) + \nabla f(x)^{T} (y-x) + \frac{1}{2}(y-x)^{T} \nabla^2
@@ -514,9 +515,9 @@ constraint qualification (CQ).
 Given Slater CQ we can prove the following
 
 \begin{theorem}
-    Let $ x^{*} $ be a local minimum of \ref{eq: convex_constrained}, which
-    fulfills Slater CQ. Then there exist Lagrange multipliers $\lambda^{*}
-    \in \mathbb{R}^{m}$ and $\mu^{*} \in \mathbb{R}^{p}$  such
+    Let $ x^{*} $ be a local minimum of \ref{eq: convex_constrained} and the
+    problem fulfills Slater CQ. Then there exist Lagrange multipliers
+    $\lambda^{*} \in \mathbb{R}^{m}$ and $\mu^{*} \in \mathbb{R}^{p}$  such
     $(x^{*},\lambda^{*},\mu^{*})$ is a KKT point of \ref{eq:
     convex_constrained}.
 \end{theorem}
