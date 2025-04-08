@@ -127,13 +127,15 @@ higher probability in the probability distribution given by the policy.
     A policy is a mapping $\pi : S \to \Delta\left( A \right)$, where $S$ is
     the state space and $\Delta(A)$ is the set of probability distributions
     over A, the action space.
-    \newline
 
     We call the policy deterministic if:
     \begin{align}
-        \forall s \in S\;\; \exists !  a\in A:\quad \pi(s)(a) = 1
+        \forall s \in S\;\; \exists !  a\in A:\quad \pi(a|s) = 1,
     \end{align}
-    In this case we have $\text{im}(\pi) = A$, and we can say $\pi: S \to A$ with
+    where $\pi(a|s)$ is the probability of landing in action $a$ given state
+    $s$, the notation `$|$' serves as a notation for a probability
+    distribution over $a \in A(s)$ for all $s \in S$. In deterministic case
+    we have that $\text{im}(\pi) = A$, and we can say $\pi: S \to A$ with
     $\pi(s) = a$.
 \end{definition}
 Together with the definition of a policy, the aim of the agent can be
@@ -172,7 +174,8 @@ Thereby the optimal policy can be defined in a standard way
 \end{definition}
 Similarly to the policy value we can quantify the pair $(s, a)$ associated to a
 policy $\pi$ by a value, the so called state-action value
-\begin{definition}[State-action value]
+\begin{definition}[State-Action value]
+    \label{def: state-action}
     The state-action value function $Q_\pi$ associated with a policy $\pi$ is
     defined on all state-action pairs $(s, a) \in S \times A$
     \begin{align}
@@ -187,6 +190,7 @@ policy $\pi$ by a value, the so called state-action value
 Note that the expected value of the state-value function at $(s, a)$ over the policy
 distribution at state $s$ is the policy value at $s$, i.e.
 \begin{align}
+    \label{eq: value_expectation}
     \mathbb{E}_{a\sim\pi(s)}\left[Q_\pi(s, a)\right] = V_\pi(s).
 \end{align}
 Now that the framework for is set we can show that there exists an optimal
@@ -244,7 +248,7 @@ where
     &p_{s, s'} = \mathbb{P}[s'|s, \pi(s)] \quad \forall s,s' \in S \quad
     \text{is the transition probability matrix,}\\
     &v_s = V_\pi(s) \quad \forall s \in S \quad \text{is the value vector and }\\
-    &r_s = \mathbb{E}[r(s, \pi(s)] \quad \forall s \in S \quad \text{is the reward
+    &r_s = \mathbb{E}[r(s, \pi(s))] \quad \forall s \in S \quad \text{is the reward
     vector}.
 \end{align}
 For an MDP with finite horizon with a known probability matrix $P$ and a
@@ -538,7 +542,138 @@ embedding for the next layer is calculated by
     \bigoplus_{j\in\mathcal{N}_i}\alpha_{ij}^{(k)}h_j^{(k)} \right)
 \end{align}
 \section{REINFORCE}
-TODO
+In the following section we introduce a policy gradient method called
+REINFORCE \cite[Chapter~13]{sutton_barto} on a discrete MDP. For convenience
+we set the discount factor $\gamma=1$ throughout the explanation but it can
+will be later incorporated into the algorithm. The idea is to
+have a parametrization of the policy $\pi_\theta$ through some learnable
+parameters $\theta$, which is differentiable wrt. $\theta$ and finite in the
+state action space. We would like to find the optimal policy by updating the
+weights via some performance measure $J(\theta)$ at the start of an episode
+$s_0$ through
+\begin{align}
+    J(\theta) = V_{\pi_\theta}(s_0),
+\end{align}
+where $V_{\pi_\theta}$ is the policy value function of the parametrazed
+policy $\pi_\theta$. We would like to maximize the preformance measure by
+going in the estimated direction of the gradient ascent of $J$ wrt. $\theta$,
+such that the updates are of the form
+\begin{align}
+    \theta_{t+1} = \theta_t + \alpha \mathbb{E}[\nabla J(\theta_t)],
+\end{align}
+where $\alpha$ is the learning rate and expectation is over some appropriate
+distribution. To get an appropriate estimation of the gradient, we take a
+look at the gradient of the value function, by equation \ref{eq:
+value_expectation} we write the policy value as function of the state value
+\begin{align}
+    \nabla V_{\pi_\theta}(s)
+    &= \nabla \mathbb{E}_{\pi_\theta}
+    \left[
+        Q_{\pi\theta}(s, a)
+    \right] \\
+    &= \nabla \left(
+        \sum_{a}\pi_\theta(s|a) Q_{\pi_\theta}(s, a)
+    \right) \\
+    &= \sum_{a} \Big(
+        \nabla \pi_\theta(a|s)Q_{\pi_\theta}(s,a) + \pi_\theta(a|s)\nabla
+        Q_{\pi_\theta}(s, a)
+    \Big),
+\end{align}
+where the gradient here is always wrt. $\theta$. By the definition of the
+state-action function \ref{def: state-action} we have
+\begin{align}
+    \nabla V_{\pi_\theta}(s)
+    &= \sum_{a} \Big(
+        \nabla \pi_\theta(a|s)Q_{\pi_\theta}(s,a) + \pi_\theta(a|s)\nabla
+        \sum_{s',r'} \mathbb{P}[s', r'|s, a]\left( r+V_{\pi_\theta}(s') \right)
+    \Big)\\
+    &= \sum_{a} \Big(
+        \nabla \pi_\theta(a|s)Q_{\pi_\theta}(s,a) + \pi_\theta(a|s)
+        \sum_{s'} \mathbb{P}[s'|s, a]
+        \nabla V_{\pi_\theta}(s)
+    \Big).
+\end{align}
+We can keep applying the same calculation to the term in $\nabla
+V_{\pi_\theta}(s)$ to get an expectation under the probabilities of landing
+in some state $x$ from the state $s$ in $k$ steps under $\pi$, i.e.
+\begin{align}
+    \nabla V_{\pi_\theta}(s)
+    &= \sum_{x\in S}\sum_{k \in \mathbb{N} }\mathbb{P}[s\rightarrow x, k,
+    \pi]   \sum_{a} \nabla \pi_\theta(a|s)Q_{\pi}(s,a).
+\end{align}
+Then we have that
+\begin{align}
+    \nabla J(\theta)
+    &= \nabla V_{\pi_\theta}(s_0)\\
+    &= \sum_{s}\sum_{k \in \mathbb{N} }\mathbb{P}[s_0\rightarrow s, k,
+    \pi]   \sum_{a} \nabla \pi_\theta(a|s)Q_{\pi}(s,a)\\
+    &= \sum_{s}\eta(s)  \sum_{a} \nabla \pi_\theta(a|s)Q_{\pi}(s,a)\\
+    &= \sum_{s'}\eta(s') \sum_{s} \frac{\eta(s)}{\sum_{s'}\eta(s') }
+    \sum_{a} \nabla \pi_\theta(a|s)Q_{\pi}(s,a)\\
+    &= \sum_{s'}\eta(s')\sum_{s}\mu(s)\sum_{a} \nabla
+    \pi_\theta(a|s)Q_{\pi}(s,a)\\
+    &\propto \sum_{s}\mu(s)\sum_{a} \nabla
+    \pi_\theta(a|s)Q_{\pi}(s,a).
+\end{align}
+Where the constant to which the last equation is proportional to is the
+average length of an episode. The distribution $\mu$ is the on-policy
+distribution over the regular $\pi$ \cite[Chapter~9,10]{sutton_barto}, thus
+\begin{align}
+    \nabla J(\theta) \propto \mathbb{E}_\pi\left[
+        \sum_{a}Q_{\pi_{\theta}}(s_t, a)\nabla\pi_\theta(a|s_t)
+    \right]
+\end{align}
+by replacing $s$ by some sample $s_t$. Doing the same for $a$ to $a_t \sim
+\pi$ we can expand by $\pi_\theta$ to preserve equality
+\begin{align}
+    \nabla J(\theta)
+    &= \mathbb{E}_\pi\left[
+        \sum_{a}Q_{\pi_{\theta}}(s_t,
+        a) \pi_\theta(a|s_t)\frac{\nabla\pi_\theta(a|s_t)}{\pi_\theta (a| s_t)}
+    \right]\\
+    &= \mathbb{E}_\pi\left[
+        Q_{\pi_{\theta}}(s_t,
+        a_t) \frac{\nabla\pi_\theta(a_t|s_t)}{\pi_\theta(a_t|s_t)}
+    \right]\\
+    &= \mathbb{E}_\pi\left[
+        G_t \frac{\nabla\pi_\theta(a_t|s_t)}{\pi_\theta(a_t|s_t)}
+    \right],
+\end{align}
+where $G_t$ is the sum returns from $t+1$ to the terminal state $T$. The
+final weights update for the REINFORCE method is
+\begin{align}
+    \theta_{t+1} = \theta_t + \alpha G_t
+    \frac{\nabla \pi_\theta(a_t|s_t)}{\pi_\theta(a_t|s_t)},
+\end{align}
+where for the expression $\frac{\nabla
+\pi_\theta(a_t|s_t)}{\pi_\theta(a_t|s_t)}$, we can just compute the gradient
+of natural logarithm, i.e. $\nabla \ln \pi_\theta(a_t | s_t)$. Hence the
+reinforce algorithm has the following structure
+\begin{algorithm}
+\caption{REINFORCE}\label{alg: reinforce}
+    \begin{algorithmic}
+        \Require Policy parametrization $\pi_\theta$, step-size $\alpha$,
+        initial parameters $\theta$
+        \While{within computational budget}
+            \State Generate an episode $(s_0, a_0), \ldots, (s_T, a_T)$
+            through $\pi_\theta$
+            \For{$t=0,1,\ldots,T-1$}
+                \State $G_t = \sum_{k=t+1}^T\gamma^{k-t-1}  r_k$
+                \State $\theta \gets \theta + \alpha\gamma^{t} G_t
+                \nabla\ln\pi_\theta(a_t|s_t)$
+            \EndFor
+        \EndWhile
+    \end{algorithmic}
+\end{algorithm}
+Furthermore we can generalize the gradient updates to include a baseline
+function $b(s)$ \cite[Chapter~13.4]{sutton_barto}, instead of updating $G_t$
+we centralize the rewards by
+\begin{align}
+    G_t - b(s_t),
+\end{align}
+giving a much better performance. This is called the REINFORCE with baseline
+algorithm and there are a verity of options when construing the baseline
+function, some work better then others.
 \section{AlphaZero}
 The section is a brief overview of how AlphaZero \cite{alphazero} works. The
 special thing about AlphaZero is that it uses purely reinforcement learning
