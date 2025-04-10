@@ -53,7 +53,7 @@ class Node:
         Expands all possible actions, creating net policy output.
     simulate(mdp):
         Simulates a rollout from the current state randomly.
-    backpropagete(value):
+    backpropagate(value):
         Backpropagates the value through the tree.
     """
     def __init__(
@@ -200,7 +200,7 @@ class Node:
             if terminal:
                 return value
 
-    def backpropagete(self, value):
+    def backpropagate(self, value):
         """
         Backpropagates the value through the tree.
 
@@ -212,7 +212,7 @@ class Node:
         self.visit_count += 1
 
         if self.parent is not None:
-            self.parent.backpropagete(value)
+            self.parent.backpropagate(value)
             if self.value_best < value:
                 self.q_value = value/self.parent.value_best
                 self.value_best = value
@@ -240,7 +240,6 @@ class MCTS:
         self.mdp = mdp
         self.args = args
         self.model = model
-
 
     @torch.no_grad()
     def search(self, state):
@@ -275,7 +274,7 @@ class MCTS:
         for _ in range(self.args['num_rollouts']):
             n = root.select_random()
             v = n.simulate(self.mdp, self.mdp.current_block)
-            n.backpropagete(v)
+            n.backpropagate(v)
 
         for _ in range(self.args['num_searches']):
             node = root
@@ -290,9 +289,9 @@ class MCTS:
 
             if not is_terminal:
                 policy = self.model(
-                    self.mdp.encode_state(root.state, self.mdp.current_block),
+                    self.mdp.encode_state(node.state, self.mdp.current_block),
                     self.mdp.data.edge_index,
-                    y=self.mdp.encode_state(root.state[:1], self.mdp.current_block),
+                    y=self.mdp.encode_state(node.state[:1], self.mdp.current_block),
                 )
                 policy = policy.squeeze(0)
                 policy = self.mdp.mask_policy(policy, node.state)
@@ -302,7 +301,7 @@ class MCTS:
                 for _ in range(self.args['num_rollouts']):
                     n = node.select_random()
                     v = n.simulate(self.mdp, self.mdp.current_block)
-                    n.backpropagete(v)
+                    n.backpropagate(v)
 
         # return visit_count distribution
         action_probs = np.zeros(len(self.mdp.edge_list))
@@ -402,7 +401,7 @@ class MCTSParallel:
             for _ in range(self.args['num_rollouts']):
                 rollout = mem.root.select_random()
                 value = rollout.simulate(self.mdp, mem.current_block)
-                rollout.backpropagete(value)
+                rollout.backpropagate(value)
 
         for _ in range(self.args['num_searches']):
             for mem in p_memory:
@@ -417,7 +416,7 @@ class MCTSParallel:
                 )
 
                 if is_terminal:
-                    node.backpropagete(value)
+                    node.backpropagate(value)
                 else:
                     mem.node = node
 
@@ -466,7 +465,7 @@ class MCTSParallel:
                 for _ in range(self.args['num_rollouts']):
                     rollout = node.select_random()
                     value = rollout.simulate(self.mdp, p_memory[idx].current_block)
-                    rollout.backpropagete(value)
+                    rollout.backpropagate(value)
 
 class PMemory:
     """

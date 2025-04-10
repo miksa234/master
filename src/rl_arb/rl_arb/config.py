@@ -11,6 +11,8 @@ TELEGRAM_SEND_URL = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+WETH = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+
 ARGS_GAME = {
     'tau': 1,
     'M': 1,
@@ -24,18 +26,16 @@ ARGS_MODEL = {
     'num_layers': 20,
     'ff_dim': 1024,
     'policy_mheads': 3,
-    'value_mheads': 3
+    'value_mheads': 3,
+    'value_layers': 3
 }
 
 ARGS_TRAINING = {
     'C': 1.4,
-    'C_1/3' : 1.3,
-    'C_2/3' : 1.3,
-    'C_3/3' : 1.3,
     'num_iterations': 1000,
-    'num_searches': 200,
-    'num_rollouts': 0,
-    'num_self_play_iterations': 300,
+    'num_searches': 50,
+    'num_rollouts': 100,
+    'num_self_play_iterations': 200,
     'num_parallel': 10,
     'num_epochs': 1,
     'batch_size': 50,
@@ -43,7 +43,7 @@ ARGS_TRAINING = {
     'temperature': 1.25,
     'eps': 0.25,
     'dirichlet_alpha': 0.03,
-    'num_processes': 30,
+    'num_processes': 20,
     'multicore': True,
     'telegram': True,
 }

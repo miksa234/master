@@ -5,7 +5,7 @@ import torch
 import numpy as np
 from torch_geometric.data import Data
 
-from rl_arb.config import DEVICE
+from rl_arb.config import DEVICE, WETH
 from rl_arb.logger import logging
 logger = logging.getLogger('rl_circuit')
 
@@ -62,7 +62,8 @@ class MDP:
             data,
             line_mapping,
             args,
-            current_block=-1
+            current_block=-1,
+            start_node=0
     ):
         """
         Constructs all the necessary attributes for the NetGame object.
@@ -79,6 +80,8 @@ class MDP:
             The number of blocks in the data.
         current_block : int, optional
             The current block index (default is -1).
+        start_node: int, optional
+            WETH index label in the problem graph (default is 0).
         """
         self.G = G
         self.args = args
@@ -93,7 +96,7 @@ class MDP:
         self.num_blocks = len(list(self.edges.items())[0][1])-1
         self.current_block = self.num_blocks
         self.device = DEVICE
-        self.start_node = 0
+        self.start_node = start_node
 
         self.token_pool_mapping = {node: [] for node in self.nodes}
         for node in self.nodes:
@@ -198,15 +201,13 @@ class MDP:
             profit = self.calculate_profit(state, at_block)
             if profit > 3:
                 profit = 1
-            if profit < 1:
-                profit = 1
 
             value+=np.log(profit)*self.args['M']
 
-            if value < -1:
-                value = -1
-            if value > 1:
-                value = 1
+#            if value < -1:
+#                value = -1
+#            if value > 1:
+#                value = 1
 
             terminated = True
             return value, terminated

@@ -13,7 +13,7 @@ from torch import distributed as dist
 import os
 import pickle
 
-from rl_arb.net import Net
+from rl_arb.net import PolicyNet
 from rl_arb.mcts import MCTSParallel, PMemory
 from rl_arb.config import (
     DEVICE,
@@ -50,8 +50,6 @@ class AgentRLearn():
             Trains the model using the training data from self_play.
         track_baseline(values, gamma_factors, blocks)
             Updates the baseline_tracker and give baseline values for current iteration.
-        adapt_exploration_parameter(iteration)
-            Updates the exploration parameter of the UCB formula for based on interation number.
         """
         self.model = model
         self.args = args
@@ -155,24 +153,6 @@ class AgentRLearn():
 
         return baseline*np.array(gamma_factors)
 
-    def adapt_exploration_parameter(self, iteration):
-        """
-        Adapts the exploration parameter of MCTS based on the current iteration.
-
-        Parameters
-        ----------
-        iteration : int
-            The current iteration number.
-        """
-        if iteration <= self.args['num_iterations']:
-            self.mcts.set_C(self.args['C_3/3'])
-
-        if iteration <= self.args['num_iterations']*2//3:
-            self.mcts.set_C(self.args['C_2/3'])
-
-        if iteration <= self.args['num_iterations']//3:
-            self.mcts.set_C(self.args['C_1/3'])
-
 
     def learn(self, optimizer):
         """
@@ -184,7 +164,6 @@ class AgentRLearn():
             logger.info(f"Iterations: {iteration+1}/{self.args['num_iterations']}")
             if self.args['telegram']:
                 send_telegram_message(f"Iterations: {iteration+1}/{self.args['num_iterations']}")
-            self.adapt_exploration_parameter(iteration)
 
             memory = []
             self.model.eval()
@@ -317,7 +296,7 @@ def train(rank, world_size, memory, mcts, iteration):
     dist.init_process_group('nccl', rank=rank, world_size=world_size)
 
     dist.barrier()
-    model = Net(ARGS_MODEL)
+    model = PolicyNet(ARGS_MODEL)
     model.load_state_dict(
         torch.load(
             f"./model/model_{iteration}.pt",

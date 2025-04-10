@@ -12,7 +12,102 @@ logger = logging.getLogger('rl_circuit')
 
 from rl_arb.config import DEVICE
 
-class Net(nn.Module):
+class ValueNet(nn.Module):
+    """
+    A Residual Network model for graph-based data.
+
+    Parameters
+    ----------
+    args : dict
+        in_channels : int
+            Number of input channels.
+        emb_channels : int
+            Number of embedding channels.
+        num_heads : int, optional
+            Number of attention heads. Default is 4.
+        num_layers : int, optional
+            Number of layers in the network. Default is 3.
+        policy_mheads : int
+            Number of attention heads for the policy head.
+        value_mheads : int
+            Number of attention heads for the value head.
+
+    Attributes
+    ----------
+    encoder : Linear
+        Linear layer for encoding input features.
+    hidden_blocks : nn.ModuleList
+        List of hidden residual blocks.
+    policy_head : Sequential
+        Policy head for outputting policy logits.
+    """
+    def __init__(
+        self,
+        args,
+    ):
+        super().__init__()
+
+        self.encoder = Linear(args['in_channels'], args['emb_channels'])
+
+        self.hidden_blocks = nn.ModuleList()
+        for _ in range(args['value_layers']):
+            self.hidden_blocks.append(
+                ResCovBlock(args)
+            )
+
+        self.value_head = Sequential('x, edge_index, batch', [
+            (GATConv(
+                3*args['emb_channels'],
+                args['emb_channels'],
+                heads=args['policy_mheads'],
+            ), 'x, edge_index -> x'),
+            (LayerNorm(args['emb_channels']*args['policy_mheads']), 'x, batch -> x'),
+            nn.ReLU(),
+            (Linear(args['emb_channels']*args['policy_mheads'], 1, bias=False), 'x -> x'),
+            nn.ReLU()
+        ])
+
+    def forward(self, node_attr, edge_index, y, batch=None):
+        """
+        Forward pass of the ResNet model.
+
+        Parameters
+        ----------
+        node_attr : Tensor
+            Node attributes.
+        edge_index : Tensor
+            Edge indices.
+
+        Returns
+        -------
+        tuple
+            A tuple containing the value estimation and policy logits.
+        """
+        x = self.encoder(node_attr)
+        x_1 = self.encoder(y)
+        for block in self.hidden_blocks:
+            x = block(x, edge_index, batch)
+
+        mean = global_mean_pool(x, batch)
+        if batch != None:
+            x_n = []
+            for i in batch.unique():
+                count = (batch == i).sum()
+                x_n.append(mean[i].repeat(count, 1))
+            x_n = torch.cat(x_n, 0)
+        else:
+            x_n = mean.repeat(x.shape[0], 1)
+        x_c = torch.cat((x, x_n, x_1), dim=1)
+
+        values = self.value_head(x_c, edge_index, batch).flatten().unsqueeze(0)
+
+        if batch != None:
+            values = values.view(len(batch.unique()), -1)
+
+        return torch.mean(values, dim=1)
+
+
+class PolicyNet(nn.Module):
     """
     A Residual Network model for graph-based data.
 
@@ -55,16 +150,16 @@ class Net(nn.Module):
                 ResCovBlock(args)
             )
 
-            self.policy_head = Sequential('x, edge_index, batch', [
-                (GATConv(
-                    3*args['emb_channels'],
-                    args['emb_channels'],
-                    heads=args['policy_mheads'],
-                ), 'x, edge_index -> x'),
-                (LayerNorm(args['emb_channels']*args['policy_mheads']), 'x, batch -> x'),
-                nn.ReLU(),
-                (Linear(args['emb_channels']*args['policy_mheads'], 2, bias=False), 'x -> x'),
-            ])
+        self.policy_head = Sequential('x, edge_index, batch', [
+            (GATConv(
+                3*args['emb_channels'],
+                args['emb_channels'],
+                heads=args['policy_mheads'],
+            ), 'x, edge_index -> x'),
+            (LayerNorm(args['emb_channels']*args['policy_mheads']), 'x, batch -> x'),
+            nn.ReLU(),
+            (Linear(args['emb_channels']*args['policy_mheads'], 2, bias=False), 'x -> x'),
+        ])
 
     def forward(self, node_attr, edge_index, y, batch=None):
         """

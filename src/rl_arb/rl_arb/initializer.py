@@ -16,13 +16,14 @@ except RuntimeError:
 
 from rl_arb.mdp import MDP
 from rl_arb.mcts import MCTS
-from rl_arb.net import Net
+from rl_arb.net import PolicyNet, ValueNet
 from rl_arb.rlearn import AgentRLearn
 from rl_arb.config import (
     DEVICE,
     ARGS_GAME,
     ARGS_MODEL,
-    ARGS_TRAINING
+    ARGS_TRAINING,
+    WETH
 )
 from rl_arb.utils import (
     load_pools_and_tokens,
@@ -68,11 +69,11 @@ class Initializer():
     """
     def __init__(self):
         pools, tokens = load_pools_and_tokens(
-            '../data/pools/pools_deg_5_liq_100_block_18_paths_2.csv',
+            '../data/pools/pools_deg_5_liq_100_block_18_grad.csv',
             '../data/tokens/tokens.csv',
         )
         prices = pd.read_parquet(
-            '../data/prices/prices_deg_5_liq_100_block_18_paths_2_gap_12h.parquet'
+            '../data/prices/prices_deg_5_liq_100_block_18.parquet'
         )
         pools, prices = filter_pools_with_no_gradient(pools, prices)
 
@@ -104,16 +105,16 @@ class Initializer():
         t0_using = [0 for _ in range(len(L.nodes))]
         t1_using = [0 for _ in range(len(L.nodes))]
 
-
         node_attr  = torch.tensor(np.dstack([*rates, used, t0_using, t1_using])).float().squeeze(0)
         edge_index = torch.tensor(edge_list).t().contiguous()
         data = Data(x=node_attr, edge_index=edge_index)
 
-        mdp = MDP(G, data, line_mapping, ARGS_GAME)
+        mdp = MDP(G, data, line_mapping, ARGS_GAME, start_node=token_mapping[WETH])
 
-        model = Net(
+        model = PolicyNet(
             ARGS_MODEL
         ).share_memory().to(DEVICE)
+
 
 #        model.load_state_dict(
 #            torch.load(
@@ -122,7 +123,7 @@ class Initializer():
 #                map_location=DEVICE
 #            )
 #        )
-#
+
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-4)
 #        optimizer.load_state_dict(
 #            torch.load(

@@ -69,25 +69,19 @@ def test_model():
     problem.mdp.data.to(DEVICE)
     problem.mdp.device = DEVICE
     problem.model.to(DEVICE)
-    problem.model.load_state_dict(
-        torch.load(
-            "../model_750.pt",
-            weights_only = True,
-            map_location=DEVICE
-        ),
-        strict = False
-    )
+#    problem.model.load_state_dict(
+#        torch.load(
+#            "../model_750.pt",
+#            weights_only = True,
+#            map_location=DEVICE
+#        ),
+#        strict = False
+#    )
     problem.model.share_memory()
     problem.model.eval()
 
 
-#    for name, param in problem.model.named_parameters():
-#        print(name)
-#        print(param.shape)
-#        print(param)
-#    exit()
-
-#    state = [(1, 1, 0), (1, 0, 0), (0, 4, 1)]
+#    state = [(0, 0, 0), (0, 3, 2), (3, 5, 0), (5, 3, 4), (3, 0, 0)]
 #    actions = [(0, 4, 1) for _ in range(5)]
 #    data_list = [Data(
 #        problem.mdp.encode_state(state, problem.mdp.current_block-1),
@@ -95,12 +89,12 @@ def test_model():
 #        y=problem.mdp.encode_state(state[:1], problem.mdp.current_block-1)
 #    ) for _ in range(5)]
 #    batch = Batch.from_data_list(data_list).to(DEVICE)
-#    policy = problem.model.forward(
+#    value = problem.value_model.forward(
 #        batch.x, batch.edge_index,
 #        batch.y,
 #        batch.batch
 #    )
-#    policy = policy.view(batch.batch_size, -1)
+#    print(value.shape)
 #    values = torch.tensor([0.4, 0.5, 0.5, 0.5, 0.5]).float().to(DEVICE)
 #
 #    one_hot = torch.zeros_like(policy)
@@ -149,7 +143,9 @@ def test_model():
             action = problem.mdp.edge_list[action_idx]
             state = problem.mdp.get_next_state(state, action)
 
-            value, is_terminal = problem.mdp.get_value_and_terminated(state, problem.mdp.current_block)
+            value, is_terminal = problem.mdp.get_value_and_terminated(
+                state, problem.mdp.current_block
+            )
 
             if is_terminal:
                 values.append(value)

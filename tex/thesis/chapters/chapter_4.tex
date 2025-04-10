@@ -1,11 +1,4 @@
 \chapter{Reinforcement Learning and Graph Neural Networks (GNNs)}
-\begin{enumerate}
-    \item What is RL, MDPs ? (OK)
-    \item Policy, value function, state-action value function (OK)
-    \item Why does it work -> Bellman equations (OK)
-    \item MCTS based methods (model based methods) (OK)
-    \item Reinforce algorithm with/without baseline approximations (TODO)
-\end{enumerate}
 In this chapter we introduce the framework on which the quasioptimal solution
 of finding the arbitrage walk is going to be based on. We are going to give a
 brief introduction to Monte Carlo based Reinforcement Learning which we will
@@ -520,27 +513,32 @@ operation e.g. sum, mean, maximum or a recurrent neural network
 
 Dealing with real world networks it is piratical to incorporate edge
 attributes in the GNN mechanism. For the attention type this is done with
-success in the original paper GAT \cite{gan_velickovic} and improved on in
-\cite{wsgat} by allowing signed weights through the attention coefficient.
-The computation of the attention coefficient is the following
+success in the original paper GAT \cite{gan_velickovic}. Given a set of node
+features $(h_i)_{i=1}^{N}\subset  \mathbb{R}^{d}$, the GAT layer produces new
+features $(h'_i)_{i=1}^{N} \subset \mathbb{R}^{Kd'}$ with dimension $Kd'$. The
+computation of the attention coefficient is the following
 \begin{align}
-    \alpha_{ij}^{(k)} = \text{sign}\left(e_{ij}  \right) \cdot
-    \text{softmax}_j\left(\text{abs}(e_{ij}^{(k)})\right),
+    \alpha_{ij} =
+    \text{softmax}_j\left(\text{abs}(e_{ij})\right),
 \end{align}
-where
+where a attention mechanism $a: \mathbb{R}^{d'}\times\mathbb{R}^{d}\to
+\mathbb{R}$ compute the attention coefficients through a learnable
+matrix $W\in \mathbb{R}^{d'\times d}$
 \begin{align}
-    e_{ij}^{(k)} = \text{MLP}^{k}\left(h_i^{(k)} \| h_j^{(k)} \| w_{ij}\right).
+    e_{ij}^{(k)} = a(Wh_i, Wh_j).
 \end{align}
-Here $\|$ is the concatenation operator,  $w_{ij}$ is the weight of the edge
-(or edge attribute), $\text{MLP}^{k}$ is a $k$-th layer multilayer
-perceptron, where the last weight can produce negative values, $h_i^{(k)}$
-and $h_j^{(k)}$ is the node feature embeddings after the $k$-th GNN layer.
-The input features are in the 0-th layer $h_i^{(0)} = x_i$. Then the node
-embedding for the next layer is calculated by
+To stabilize the learning process, a multi-head attention mechanism is
+employed with $K$ independent attention heads through
 \begin{align}
-    h_{i}^{(k+1)} = g\left( h_i^{(k)},
-    \bigoplus_{j\in\mathcal{N}_i}\alpha_{ij}^{(k)}h_j^{(k)} \right)
+    h_i' = \|_{k=1}^{K} \sigma\left(
+        \sum_{j\in\mathcal{N}_i}\alpha_{ij}^{k} W^{k} h_j
+    \right),
 \end{align}
+where $\sigma$ is an activation function, $\alpha_{ij}^{k}$ is normalized attention
+coefficient computed by the $k$-th attention head $a^{k}$ with the
+corresponding learnable matrix $W^{k}$ and $\|$ is the concatination
+operator. The usual choice for $a$ is sigle layer feed forawrdneural network
+with LeakyRelU activation function.
 \section{REINFORCE}
 In the following section we introduce a policy gradient method called
 REINFORCE \cite[Chapter~13]{sutton_barto} on a discrete MDP. For convenience
@@ -639,7 +637,7 @@ by replacing $s$ by some sample $s_t$. Doing the same for $a$ to $a_t \sim
         G_t \frac{\nabla\pi_\theta(a_t|s_t)}{\pi_\theta(a_t|s_t)}
     \right],
 \end{align}
-where $G_t$ is the sum returns from $t+1$ to the terminal state $T$. The
+where $G_t$ is the sum of the discounted rewards from $t+1$ to the terminal state $T$
 final weights update for the REINFORCE method is
 \begin{align}
     \theta_{t+1} = \theta_t + \alpha G_t
@@ -674,100 +672,75 @@ we centralize the rewards by
 giving a much better performance. This is called the REINFORCE with baseline
 algorithm and there are a verity of options when construing the baseline
 function, some work better then others.
-\section{AlphaZero}
-The section is a brief overview of how AlphaZero \cite{alphazero} works. The
-special thing about AlphaZero is that it uses purely reinforcement learning
-to optimize the policy and there is are is no outside data fed in. There are
-two separate phases for making the model work with purely
-reinforcement learning, in the one phase the model plays with itself and
-gathers information about the environment and gathers the data. In the second
-phase the information of the self play part is used to optimize the model and
-then AlphaZero plays with the optimized model against itself again, forming a
-loop \ref{fig: 5}.
+\section{REINFORCE with MCTS\label{sec: gen}}
+In this section we give a brief overview of how we can utilize MCTS with
+REINFORCE. Instead of doing a one-per-one episode, we are going
+to compute batches of episodes and average out the Monte
+Carlo improved policy gradients to compute the updates. There are two
+separate phases for making the algorithm work with purely reinforcement
+learning, in the one phase the model plays with itself and gathers
+information about the environment and gathers the `data'. In the second phase
+the information of the self play part is used to update the weights of the
+policy parametrization \ref{fig: 5}.
 \begin{figure}[H]
     \centering
     \begin{tikzpicture}
-        \node[font=\bfseries] (0) {SelfPlay};
-        \node[right=of 0] (1) {$f_{\theta}(s) = (p, v)$};
+        \node[font=\bfseries] (0) {Self-Play};
+        \node[right=of 0] (1) {$\pi_{\theta}(s)$};
         \node[font=\bfseries, right= of 1] (2) {Train};
 
         \draw[->, ultra thick] (0) to[out=90, in=90] node[midway, above]
-            {gather info} (2);
+            {gather episodes} (2);
         \draw[->, ultra thick] (2) to[out=270, in=270] node[midway, below]
             {optimize} (0);
     \end{tikzpicture}
-    \caption{AlphaZero cycle \label{fig: 5}}
+    \caption{Self-Play loop \label{fig: 5}}
 \end{figure}
-The optimization is done through the parameters $\theta$ of a deep neural
-network $f_\theta(s) = (p, v)$, which takes a state as input and outputs the
-transition probability vector $p_a = \mathbb{P}[a|s]$ for each action and a
-scalar value $v$, which estimates the outcome of position $s$, $v \simeq
-\mathbb{E}[r|s]$.
-In the self-play phase the model uses the MCTS algorithm to traverse down the
-MDP tree from the root node $s_0$. The key difference in the walk to a leaf
-node is that alpha zero incorporate the output of $f_\theta(s)$ in $UCB$
-formula, which can be expressed as follows
+The policy is parametrized through through the parameters $\theta$ of a deep
+neural network $\pi_\theta$, which takes a state as input and outputs the
+transition probability vector $\pi_\theta(s)$ for each action. In the
+self-play phase the model uses the MCTS algorithm to traverse down the MDP
+tree from the root node $s_0$. The key difference from traditional MCTS is
+the selection strategy, the $UCB$ formula used is
 \begin{align}
-    UCB = Q(s,a) + U(s,a),
+    UCB = \max_a \left(Q(s,a) + U(s,a)\right), \label{eq: mod_ucb}
 \end{align}
-where $Q(s,a)$ is the state-action value, and $U(s,a)\propto
-\frac{P(s,a)}{1+N(s,a)}$ a value dependent on the node visit count $N(s, a)$
-and probability $P(s, a)$ given by the deep neural network $f_\theta(s)$.
-Furthermore, AlphaZero does not utilize the third phase of the MCTS algorithm
-which randomly applies actions until reaching a terminal state. Instead, it
-just proceeds with the fourth phase of MCTS, of evaluating the current state
-and backpropagating to the root state. The architecture of $f_\theta$ is
-highly dependent on game/problem learned. Generally the first thing is state
-encoding, that is encoding the state in a usable way in AlphaGo
-Zero\cite{alphazero} the state is encoded in a $19x19x17$ array, instead of a
-simple $19x19$ board. The encoded state is passed residual neural network
-where the output is split into a value head neural network with zero-centered
-activation function to produce $v$ and a policy head neural network with
-softmax activation function to output $p$.
-
-\section{Application to Problem}
-TODO: Move to next section remove NP-hard
-
-The problem finding a path starting and ending at the same node with no
-repeated edges which minimizes the weights is an NP-hard because it is a case
-of a traveling salesman problem (TSV). As a first exploration step AlphaZero
-is applied on the problem. The underlying MDP is a deterministic one, since
-taking an action corresponds using an edge to get to the next node. The MDP
-has also with finite horizon, dependent on the graph size. The agent starts
-at a node $v_0$ corresponding, follows a policy to take actions/edges leading
-to the next node $v_1$ until forming a circuit $\left\{ v_0, v_1, \ldots, v_0
-\right\}$. The valid actions are edges from the current node $v_i$ that have
-not yet been traversed. The state could be the path the agent is currently
-taking, i.e. a sequence of nodes $s = \left\{ v_0,v_1,\ldots \right\}$. Upon
-arrival of the terminal state, which is either a circuit or a dead end the
-reward $R$ must be assigned correspondingly. It makes sence to keep a track
-of the agents `score', such that the model will try to find the path with the
-highest score. The score should be higher based on the sum of the weights and
-the number of actions taken. . The agent should be punished with a negative
-reward upon ending up at a terminal state which is not the desired circuit,
-i.e. dead end. So the total reward will be combined from a global reward
-(winning or losing) and a local reward (weight minimization/score)
+where $Q(s,a)$ is the state-action value, and
+\begin{align}
+U(s,a)=C \pi_\theta(a|s)\sqrt{\frac{\sum_{i}N(s, a_i)}{1+N(s,a)}},
+\end{align}
+where $C$ is the exploration-exploration constant, $\pi_\theta(a|s)$ is the
+probability output for action $a$ at state $s$ of the parametrized policy,
+$N(s, a)$ the node visit count and $\sum_{i} N(s, a_i)$ is the visit count of
+the parent. Generally it is non-trivial to find a suitable value for the
+constant $C$, theoretically it is set to $\sqrt{2}$ in the multi-armed bandit
+attack and MDP environments which have rewards spread evenly in the interval
+$[0, 1]$. To avoid time-consuming tuning of the constant $C$ we normalize the
+$Q$ values during backpropagation. For the normalization we keep track of two
+quantities, the $Q$ value of the state action and the best value $b$. The $Q$
+value does not exceed $1$ and at the start of each search the best value of
+the root node is set to $b_0 = 1$ and else $0$. Continuously during the
+backpropagation phase if the best of the child value exceeds the best value
+of the parent, then $b_p$ (parent best value) is updated to the better value
+and the $Q$ value is then set to
+\begin{align}
+    Q_c = \frac{r_c}{b_p},
+\end{align}
+where the subscript $c$ denotes the child and the subscript $p$ the parent
+node, $r_c$ is the estinaded reward of the child from the simulation phase
+and the current state and $b_p$ is the best value of the parent.
 \newline
 
-Steps have been taken in implementing the problem in python and applying the
-MCTS algorithm on the problem. The current difficulties aeries when trying to
-implement AlphaZero because of the state encoding. The state encoding in
-graph based problems needs to be done through GNNs, but the output also needs
-to consider valid moves which are the edges not traversed. Hence, it might
-make sense to somehow encode the valid moves in the input through dynamic
-edges, i.e. removing edges. This is implemented in \cite{rl_coopt} by
-masking, and with encoder-decoder layer. But will the removal of the edges
-even make, since from a reinforcement learning perspective ? How should the
-input layer look like ? The code can be found in \cite{github}.
-\newline
-
-To construct the encoded input it is useful to pass information about the
-weights, edges visits, node/edge embeddings and current node/state. For the
-weights, a weighted adjacency matrix of the graph can be used. For the edge
-visits a binary matrix of the size of the adjacency matrix can be used, where
-$1$ indicates the edge as visited and $0$ as unvisited. And the node/edge
-embeddings a variation of methods described in section \ref{sec: gnn} can be
-used. Lastly, as an indicator for the current node position the agent is in.
-Similarly like in AlphaGo Zero, the information of the previous couple of
-states can be concatenated together to get a promising input.
-
+After an MCTS search we get the so called MCTS improved policy at state $s$
+for action $a$,
+\begin{align}
+    \pi^{\text{MCTS}}(a|s) = \frac{Q(s, a)}{\sum_{a'}Q(s, a')}
+\end{align}
+We choose the action with the highes probability
+\begin{align}
+    a = \argmax_a \pi^{\text{MCTS}}(a|s),
+\end{align}
+transitioning to the next state and doing the MCTS search on the new state.
+After playing $N_{\text{play}}$ times, for each time step of each episode we
+compute the average of $\nabla \ln \pi_\theta$ and $G_t$ to update the
+parameters as in REINFORCE \ref{alg: reinforce}.

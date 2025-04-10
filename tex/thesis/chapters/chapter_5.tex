@@ -1,194 +1,246 @@
 \chapter{Finding a Quasioptimal N-Cyclic Arbitrage Walk with MCTS based REINFORCE}
-\begin{enumerate}
-    \item Model of the MDP
-    \item Reward system
-    \item Specifics about the MCTS -> palatalization
-    \item DGNN architecture
-    \item Hyperparameters
-    \item Settings and Tweaks
-    \item Data used
-    \item Results
-\end{enumerate}
-TODO: ALL OF THIS NEEDS TO BE CHANGED TO REINFORCE
-
-This chapter will go through the RL framework \& neural network model used
-find profitable walks in the arbitrage problem. Firstly the agent and the
-environment for the setting is defined together with objective and the
-rewards. Secondly Graph Neural Network and the training framework are
-outlined. The distinct case here is that model is trained on the line graph
-of the defined problem graph. The reason for this choice is for
-generalization purposes. The last section explains the rough process of
-obtaining and filtering the data necessary as an input for the problem and
-learning.
+In chapter we go through the RL framework \& neural network model used
+to find profitable walks in the CFMM arbitrage problem and present results.
+Firstly we introduce the model for the underlying MDP, states, actions and
+rewards. The policy is parametrized  via the deep GNNs of the line graph of
+the problem and the training setup uses the setup from chapter \ref{sec:
+gen}.
 
 \section{Agent and Environment}
-The framework (or the game) the agent is trying to learn is finding a walk
-in a graph that does not use repeated edges (trail), starts and ends at
-the same node (circular) and is profitable. The graph is represented by ERC20 \cite{erc20}
-tokens as edges and decentralized exchange pools as edges. Each pool has a
-swap fee, which usually is in the range of $0.3\%-1\%$, and a marginal
-exchange rate. The marginal exchange rate, unique to the pool, is inversely
+The framework the agent is learning to find a walk in a graph that does not
+use repeated edges (trail), starts and ends at the same node, i.e. is
+circular, and is profitable. The graph is represented by ERC20 \cite{erc20}
+tokens (referred to as assets) as nodes and decentralized exchange pools,
+CFMM with two assets, as edges (referred to as pools). Each pool has a swap
+fee, which usually is in the range of $0.3\%-1\%$, and a marginal exchange
+rate. The marginal exchange rate, unique to the pool, is inversely
 bidirectional. Meaning, while swapping token $0$ for token $1$ in the pool
 the usual marginal exchange rate is used, but when swapping from token $1$ to
 token $0$ the inverse marginal exchange rate is used. In both cases the
 referred term is marginal exchange rate. `Used' here is meant in the context
 of the learning setup, in the actual setting the automated market maker
-formula is used to determine the amount exchanged.
+formula is used to determine the amount exchanged \ref{chap: cfmms}.
+Throughout we will use the term `pool' and edge, `asset' and node
+interchangeably.
 \newline
 
-The agent, starting from the given node (token) chooses actions from a set of
-valid actions. Actions are moves to the next node via an edge (pool). The
-valid actions rule out the edges that have been used already. The idea behind
-this is the following. If there is an arbitrage opportunity, and the trades
-are conducted in a chronological order, at each swap the pool's `capacity'
-will be exerted and the pool's exchange rate will in balance with the overall
-market. Hence, the pool has no liquidity for an arbitrage to be used again.
+The agent starts from a given node (asset) and chooses actions from a set of
+valid actions. Each action represents a trade, where the agent swaps an asset
+for another asset through a specific pool. The valid actions rule out the
+edges that have already been used. The idea behind this is the following: If
+there is an arbitrage opportunity, and the trades are conducted in a
+chronological order, at each swap the pool's `capacity' will be exerted and
+the pools' exchange rate will be in balance with the overall market. Hence, the
+pool has no liquidity for an arbitrage to be used again.
 \newline
 
-When the agent arrives at a terminal state, there are two possibilities.
-Firstly the agent has arrived back to its starting point, where the product
-of the exchange rates is calculated to give the profit of the walk. In this
-case, at each trade a trading penalty is utilized to account for the fees
-of each transaction. The second case is where the agent arrives at a dead
-end, meaning the agent has not reached the starting point and has no valid
-actions left.
+When the agent arrives at a terminal state, there are two possibilities. The
+first possibility is when the agent has arrived back to the starting point,
+then the product of the exchange rates is calculated to give the profit of
+the walk. In this case, at each trade a trading penalty can utilized to
+account for the fees of each transaction. The second possibility is when the
+agent arrives at a dead end, meaning the agent has not reached the starting
+point and has no valid actions left.
+\newline
 
-\subsection{Rewards}
-When reaching a terminal state the agent is rewarded a different amount. In
-the case the agent is at a dead end the reward is
+To bring it all together the MDP is based on a multi bidirectional graph $G =
+(V, E, W)$, where $V$ is the set of nodes (assets), $E$ the set of edges
+(pools) and $W$ the set of edge weights (prices based on the specific pool).
+An edge $e_{ij}^{k}  \in E$ represents the pool $k$ trading assets $i$ $j$,
+it has the weight
 \begin{align}
-    r_L = -1.
+w_{ij}^{k} =\frac{p_i^{k} }{p_j^{k} },
 \end{align}
-In the case the agent ends back up at the origin, the reward is the sum of
-the natural logarithm of the marginal exchange rates $Z_p$ in the path $P$
-and the trade penalty $\tau$. Additionally, the sum is adjusted by a
-win-loss multiplier $M$ to give the reward
+where $p_i^{k} $ and $p_j^{k} $ are the marginal exchange rates of the assets
+$i$ and $j$ in pool $k$ respectively as defined in equation \ref{eq:
+marginal_rate}. The edge $e_{ji}^{k}$ has the weight
 \begin{align}
-    r_W = M \cdot \sum_{p \in P} \log(Z_p \cdot \tau)
+w_{ji}^{k}  = \frac{1}{w_{ij}^{k} } = \frac{p_j^{k}}{p_i^{k}}.
 \end{align}
-The idea behind using the sum of the natural logarithm of the marginal
-exchange rates is that it accounts to the sequence of trades that give no
-profit. A sequence of trades will be a profitable if the product of the
-marginal exchange rates is bigger than $1$ and a not profitable if it is
-smaller. The logarithm will be positive for a profitable trade and negative
-for a nonprofitable one. Another reason for using the logarithm is to adjust
-for the high discrepancy of the marginal exchange rates between the pools.
-\newline
+The index $k$ denotes the $k$-th pool trading asset $i$ and asset $j$, since
+there could be multiple pools trading the same asset. The underlying MDP is a
+$4$ tuple $(S, A, P, R)$, deterministic, and is specified by
+:\newline
+\textbf{Actions}. The action space $A$ are all the possible actions the agent
+can take on the graph defined above. The agent acts by taking an action $a_t
+\in A$ at step $t$ by selecting an edge $e_{ij}^{k}$ leading to adjacent nodes
+and thereby transitioning from node $i$ to node $j$ at pool $k$. The
+action is valid if the edge $e_{ij}^{k}$ has not been selected throughout the
+episode.\newline
+\textbf{States}. The state space $S$, and a state $s_t \in S$ is the edge set
+traversed by the agent up to step $t$ of the episode. The state $s_t$ is
+terminal if there are no valid actions or the agent has reached the origin
+node. If the agent has not reached a terminal state then the agent selects an
+action $a_t \in A$ and transitions to the next state $s_{t+1} = s_t \cup a_t$
+recursively.\newline
+\textbf{Transition}. The transition probabilities $P$, where
+$\mathbb{P}[s'|s, a] = 1$ is the probability of landing in state $s'$ by
+taking action $a$ at state $s$. The MDP is deterministic.\newline
+\textbf{Rewards}. The reward probabilities $R$, since the MDP is
+deterministic the reward function at state $s_t$ is $r(s_t)$. Throughout the
+MDP, the agent is rewarded $r(s_t) =0$, except when landing back at the
+origin node. All together the agent is rewarded by
+\begin{align}
+    r(s_t) =
+    \begin{cases}
+        \max\left\{0, \sum_{w_{ij}^{k}  \in s_t}\ln(w_{ij}^{k} \cdot \tau)\right\}  \quad
+        &\text{terminal state and reached the
+        origin node}\\
+            0 \quad &\text{else},
+    \end{cases}
+\end{align}
+where $w_{ij}^{k}$ are the weights of the walk of $s_T$, i.e. marginal
+exchange rates, $\tau \in[0, 1]$ is the trade penalty which incorporates a
+rough estimate of the transaction cost for each trade. Throughout the
+training we set $\tau = 1$, however in production it might be useful to set
+an adaptive value to get an estimate if the overall trade will be profitable
+after paying the protocol-transaction fees. If the sum of the logarithm of
+the marginal exchange rates is bigger then zero then the trade is profitable
+and otherwise it is not. The natural logarithm comes here as a big
+convenience to characterize profitable and nonprofitable trades,it also
+avoids $256$-bit integer overflows, (most of the blockchains do not use
+floating point number, but unsigned $256$-bit integers) which needs special
+attention when coding in production. In summary the agent is only rewarded if
+end node matches the start node.
 
-The use of the trade penalty $\tau$ is generally a good idea since it
-accustoms for the gas fee of each transaction. But it might prevent the
-algorithm from finding any profitable walks because they are actually rare,
-since the market is usually in balance. Thus, in the training process the use
-of this parameter is omitted by setting $\tau = 1$. In actual production it
-is useful to set $\tau \in [0.95, 1)$, or even an adaptive value. The value
-of the win-loss multiplier is set to $M=2$ for training.
-
-\section{Deep Graph Neural Network}
-The idea is to train a model that is general in the sense that it can be used
-on smaller or bigger graphs, graphs of different node and edge size. Encoding
-the state and pushing it through a traditional Deep NN will give us the same
-policy dimension every time, which depends on the architecture of the
-network. Instead, the aim is to always get a policy vector that has the size
-of two times the amount of pools, since the agent can move in both directions
-of the pool (inverse marginal exchange rate). This is essentially the same
-amount as the edges in the problem graph. A good idea is to use a graph
-neural network, but the output is a policy vector of the size of the number of
-nodes in the graph, which have no connection to the number of edges in the
-graph. To make the model more general the model will be trained on a graph
-neural network based on the line graph of the problem graph. The line graph of a
-graph has node for each edge in the actual graph. Two nodes are connected
-by an edge if and only if their edges in the original graph share a common
-endpoint. Each node (pool) in the line graph will have five attributes:
-\begin{itemize}
-    \item Marginal exchange rate
-    \item Pool swap fee
-    \item Binary entry if used or not
-    \item Binary entry if the agent is currently at token 0 of this pool
-    \item Binary entry if the agent is currently at token 1 of this pool
+\section{Policy Parametrization}
+We are going to parametrize the policy $\pi_\theta$, such that given a state
+$s$ the output of $\pi_\theta(s)$ will be a probability vector of size $n = |E|$.
+This probability vector will be masked based on the valid actions at state
+$s$ and then normalized. To archive this we will encode the state $s$ through
+the line graph $L(G)$ of the graph used in the MDP. The nodes of the line
+graph $L(G)$ represent the edges of the graph $G$. Two nodes are connected by
+an edge in $L(G)$ if and only if their corresponding edges in $G$ share a
+common endpoint in $G$. Instead of considering both edges $e_{ij}^{k}$,
+$e_{ji}^{k}$, we will only consider the corresponding pool connection as an
+edge. A node of the line graph $L(G)$ will have the following attributes
+\begin{itemize}[nosep]
+    \item Natural logarithm of the marginal exchange rate corresponding to
+        the pool
+    \item Binary entry stating if the pool was used $1$ or not used $0$
+    \item Binary entry stating if agent is currently using asset $0$ of the
+        pool, $1$ or not
+        $0$.
+    \item Binary entry stating if agent is currently using asset $1$ of the
+        pool, $1$ or not
+        $0$.
 \end{itemize}
-The encoder computes the node embeddings $h_i^{0}$ through a learned linear
-projection to dimension $d_h = 320$. The embeddings are then updated via. $N$
-Residual Multihead Attention Layers \cite{gatv2}. Rather than the one from
-the original paper \cite{gan_velickovic}, an updated formula for the
-attention weights is used. Each layer consists of two sublayers, a multihead
-attention layer (GAT) with $20$ heads, for message passing between the nodes
-which is flattened by a linear connection back to the original dimension
-$d_h$. And a node-wise fully connected feed-forward layer (FF) with $1280$
-hidden dimension. Both sublayers have a Batch Norm (BN) and a residual
-connection similar to \cite{rl_coopt}. The following is a sketch of the
-residual block
+Given a state $s$ the input to the policy parametrization will be encoded
+through graph as stated in the list above. The architecture of the deep GNN
+parametrization of the policy is as follows. Given the node attributes, the
+encoder computes the node embeddings $h_i^{0}$ for all nodes $i$ through a
+learned liner projection to dimension $d_h = 256$. The embeddings are then
+updated via. $N$ Residual Multihead Attention Layers \cite{gatv2}. Each layer
+consists of two sublayers, a multihead attention layer (GAT) with $16$ heads,
+for message passing between the nodes which is flattened by a linear
+connection back to the original dimension $d_h$. And a node-wise fully
+connected feed-forward layer (FF) with $1024$ hidden dimension. Both
+sublayers have a Batch Norm (BN) and a residual connection similar to
+\cite{rl_coopt}. The following is a formalization of the residual block
 \begin{align}
     \hat{h}_{i} &= \text{BN}^{l}\left( h_i^{(l-1)}
     + \text{GAT}_i^{l}(h_1^{(l-1)},\ldots,h_n^{(l-1)})\right)\\
     h_i^{(l)} &= \text{BN}^{l}\left( \hat{h}_{i} + \text{FF}_i^{l}(\hat{h}_i) \right).
 \end{align}
-The decoder has two heads, the policy head and the value head as in
-\cite{alphazero}. The policy head has a graph Multihead attention layer with
-1 head with Batch Norm forwarded to a linear layer, which expands the output
-per node by two with a Relu activation function. The value head has also a
-graph Multihead attention layer with 1 head fed through a linear layer and
-taken the mean. More details will be provided upon full finishing the project
-and settling with a finetuned architecture.
-\section{Training}
-The training is purely unsupervised based on the MCTS algorithm. Firstly the
-agent `plays' the network from a random state (node \& marginal exchange
-rates) this is called the self play stage. At each self play The marginal
-exchange rates of the prices are chosen randomly, all from a random block
-number $t$ on the Ethereum blockchain. The next state is chosen based on
-$N_{\text{MCTS}}$ searches. In each iteration the agent plays the network
-$N_{\text{play} }$ times until reaching a terminal state. Upon reaching the
-terminal state, the state, the policy vector and the values of the MCTS
-algorithm along the state path are saved. After the self play stage the model
-parameters are updated based on the self play data with batch number
-$N_{\text{batch} }$ and $N_{\text{epoch} }$ epochs. The loss function
-consists of separate policy loss, a cross entropy loss with mean
-reduction and a value loss, a mean-squared loss. These are then added
-together for a full loss function.
+After which we will do a contextual embedding by concatenating the graph
+embedding $\hat{h}^{(N)} = \frac{1}{n}\sum_{i=1}^{n} h_i^{(N)}$, the node
+embedding of the initial state $h^{\pi(s_0)}_i$ and the vectors $h_i^{N}$ to
+the vector
 \begin{align}
-    L(\theta) = L_{\text{policy}}(\theta) + L_{\text{value}}(\theta),
+    h^{(c)}_i = \hat{h}^{(N)} \|  h^{\pi(s_0)}_i \| h_i^{(N)},
 \end{align}
-where $\theta$ are the parameters of the model and
+where $\|$ is the concatenation operator. The contextual embeddings
+$h^{(c)}_i$ are passed into the policy head. The policy head consists of
+GAT layer with $16$ heads passed to a Batch Norm layer and ultimately
+compressed down to an output dimension of $2$ per node through a linear
+connection with Relu activation function
 \begin{align}
-    L_{\text{policy}} (\theta) &= - \sum_{i=1}^{N_{\text{batch}}}
-    \pi(a^{(i)}_{t_i} |s ^{(i)}_{t_i})
-    \ln \left(\text{softmax}\left(\tilde{\pi}(a^{(i)}_{t_i}|s^{(i)}_{t_i};
-        \theta\right)\right) \\
-    L_{\text{value}} (\theta) &= \frac{1}{N_{\text{batch}}}
-    \sum_{i=1}^{N_{\text{batch}}}
-    \left( v(s^{(i)}_{t_i}) - \tilde{v}(s^{(i)}_{t_i}; \theta)  \right)^{2}.
+    \pi_\theta(s) = \text{softmax}\left(   W_p \cdot
+    \text{relu}\left(\text{BN}_p(\text{GAT}_p(h^{(c)}_1,\ldots,h^{(c)}_n))\right)\right),
 \end{align}
-The weighs of the model are updated using the Adam optimizer \cite{adam} with
-a learning rate of $\gamma = 10^{-3} $, a weight decay of $\lambda =
-10^{-4}$, forgetting factors $\beta_1 = 0.9$, $\beta_2 = 0.999$ and
-$\varepsilon = 10^{-8}$ to prevent division by zero.
+where $W_p \in \mathbb{R}^{2\times d_h}$ is the learned linear connection,
+and the index $p$ denotes the distinct weights used for the policy head. To
+get the policy vector we flatten and pass the softmax at the end.
+
+
+\section{Algorithm and Training}
+The training is purely unsupervised based on the MCTS and REINFORCE algorithm
+as described in Section \ref{sec: gen}. At each self play The marginal
+exchange rates of the prices are chosen randomly, some block number $b$ on
+the Ethereum blockchain. The next state is chosen based on $N_{\text{MCTS}}$
+searches with selection probabilities computed through $\pi_\theta$. In each
+iteration the agent plays the network $N_{\text{play}}$ times until reaching
+a terminal state. Upon reaching a terminal state: the state, the action, the
+reward and the policy vector of the MCTS algorithm are saved. After the self
+play stage the model parameters are updated based on the self play data. We
+fully utilize the REINFORCE algorithm updates through \ref{alg: reinforce},
+where the loss function can be written as
+\begin{align}
+    L(\theta) = -\frac{1}{N_{\text{batch}}}
+    \sum_{i=1}^{N_{\text{batch}}}G_{i} y_i
+    \ln \pi_{\theta} (s^{b_i}_{i_t}),
+\end{align}
+where $G_i$ is the sum of the rewards as in the REINFORCE algorithm, and
+$y_i$ a one hot vector with $1$ at the index of the action taken at the end
+of an MCTS. The action taken at the end of an MCTS is determined by the MCTS
+improved policy $\pi^{\text{MCTS}}$. The $Q$ values are estimated through the
+MCTS and parametrized policy $\pi_\theta$ search. The full reinforcement
+learning algorithm algorithm in pseudo-code is the following
+\begin{algorithm}[H]
+\caption{RL Algorithm}\label{alg: rl_alg}
+    \begin{algorithmic}
+        \While{within computational budget}
+        \For {$i=1,\ldots, N_{\text{play}}$}
+            \State Initialize state $s_0 = s$ at block $b$
+            \While{not terminal}
+            \State $\pi^{MCTS}(s)  \gets \text{MCTS}(s)$
+            \State  $s \gets \argmax_{a}\pi^{MCTS}(a|s) $
+            \State save $s$, $\pi^{\text{MCTS}}(s)$ and $a$
+            \EndWhile
+        \EndFor
+        \State $\theta \gets Adam(\nabla L(\theta))$
+        \EndWhile
+    \end{algorithmic}
+\end{algorithm}
+The code can be found at \cite[Github]{github}.
 \newline
 
-For now $N_{\text{batch} }=128$, $N_{\text{epochs}} = 10$, $N_{\text{play}} =
-100$, $N_{\text{MCTS}} = 50$ with $100$ iterations. The marginal exchange
-rates are pulled from the block range $t \in [18\cdot10^{6}, 21.8\cdot10^6]$.
-The number of residual block layers is $10$, these do not share weights. The
-UCB1 exploration parameter $C$ in the MCTS algorithm for choosing the next
-child in the tree is initialized as $C=3.5$ for the first third of the
-iterations for the second third $C=2.0$ and for the last third $C=1.5$.
+The weighs of the model are updated using the Adam optimizer \cite{adam} with
+a learning rate of $\alpha = 10^{-4} $, a weight decay of $\lambda =
+10^{-4}$, forgetting factors $\beta_1 = 0.9$, $\beta_2 = 0.999$ and
+$\varepsilon = 10^{-8}$ to prevent division by zero. We set the discount rate
+constant $\gamma = 0.98$ from REINFORCE \ref{alg: reinforce}. We use
+$N_{\text{batch} }=50$, $N_{\text{play}} = 1000$, $N_{\text{MCTS}} = 200$
+with $N_{\text{sim}}=500$ (MCTS simulations) with $1000$ iterations. The
+marginal exchange rates are pulled from the block range $t \in
+[18\cdot10^{6}, 21.8\cdot10^6]$. The number of residual block layers is
+$N=20$, these do not share weights. The UCB exploration-exploitation
+parameter $C$ in the MCTS algorithm for choosing the next child in the tree
+is set to $C=1.4$.
 \section{Data}
 The data used is publicly available on the Ethereum mainnet blockchain and
-can be accessed through an archive node query. The main data source are all
-the UniswapV2 and UniswapV3 \cite{uniswap}. The difference between V2 pools
-and V3 pools is that the V3 pools have concentrated liquidity pools, but both
-the follow constant product function. At the current time of writing there
-are around $4.3\cdot10^{5}$ pools and approximately $4.1\cdot10^{5}$
-different ERC20 \cite{erc20} tokens in these pools. To narrow down the
-meaningful pools, firstly we use pools that have been created before block
-$18\cdot10^{6}$ and secondly we use a degree filter. . Tokens which have a
-smaller degree then $15$ are filtered out. Left are $1885$ pools and $150$
-different tokens. The question still remains if these pools are still in use
-currently. Hence, the pools with low liquidity are also filtered out, by
-looking at their two token reserves, the $\text{ETH}$ value of the
-reserves is crucial here. If the reserve is worth less then $100\; \text{ETH} $
-it is filtered out. Left are $127$ pools and $66$ tokens. For the training
-process the marginal exchange rates of the pools are extracted from block
-$18\cdot10^{6}$ until the current block every $9000$ blocks which is equal
-to around every $30$ hours ($\sim12s$ is the time until the next block). The
-prices are then randomly sampled for training.
+can be accessed through an archive node query. The pools used are all of
+UniswapV2 \cite{uniswap} and UniswapV3 \cite{uniswapv3_paper}. The difference
+between V2 pools and V3 pools is that the V3 pools have concentrated
+liquidity pools, but both the follow constant product function. At the
+current time of writing there are around $4.3\cdot10^{5}$ pools and
+approximately $4.1\cdot10^{5}$ different ERC20 \cite{erc20} tokens in these
+pools. To narrow down the meaningful pools, firstly we use pools that have
+been created before block $18\cdot10^{6}$ and secondly we use a degree
+filter. Assets which have a smaller degree then $4$ are filtered out. The
+question still remains if these pools are still in use currently. Hence, the
+pools with low liquidity are also filtered out, by looking at their two token
+reserves, the $\text{ETH}$ value of the reserves is crucial here. If the
+reserve is worth less then $100\; \text{ETH} $ it is filtered out. We also
+look at the gradient of the marginal exchange rates for all the pools, and
+filter out the pools with low price change. For the training process the
+marginal exchange rates of the pools are extracted from block $18\cdot10^{6}$
+until the current block every $3600$ blocks which is equal to around every
+$12$ hours ($\sim12s$ is the time until the next block). During each
+self-play, a random block is sampled from which the marginal exchange rates
+are taken. Each state starts with the agent holding the WETH asset, from
+which the agent chooses a pool to conduct a swap with WETH to another token
+untill reaching a terminal state.
+
 \section{Result}
 Calculations were performed using supercomputer resources provided by the Vienna Scientific Cluster (VSC)
