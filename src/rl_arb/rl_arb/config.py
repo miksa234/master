@@ -32,13 +32,13 @@ ARGS_MODEL = {
 
 ARGS_TRAINING = {
     'C': 1.4,
-    'num_iterations': 1000,
-    'num_searches': 50,
+    'num_iterations': 100,
+    'num_searches': 100,
     'num_rollouts': 100,
     'num_self_play_iterations': 200,
     'num_parallel': 10,
     'num_epochs': 1,
-    'batch_size': 50,
+    'batch_size': 25,
     'gamma': 0.98,
     'temperature': 1.25,
     'eps': 0.25,

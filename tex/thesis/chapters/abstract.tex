@@ -1,11 +1,40 @@
-\addchap*{Abstract (English)}
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt
-ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo
-dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit
-amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor
+\addchap*{Abstract} Decentralized Exchanges (DEXs) are a new form of
+financial markets emerging on top of blockchain technology. Through these
+arises a competitive and complex environment of Maximal Extractable Value
+(MEV), where entities called Searchers race against the block time and
+compete against each other to find profitable opportunities when the market
+is at rest and the next block is not yet committed. One of these
+opportunities is an $n$-cyclic arbitrage, on which this thesis focuses on.
+Through modeling of the building blocks of DEXs, governed by Constant
+Function Market Makers (CFMMs), we can derive a nonlinear optimization
+problem finding an optimal $n$-cyclic arbitrage trade. However this
+optimization problem neither specifies the order in which these trades should
+be executed, nor reduces optimization to specific, used DEXs. To combat this,
+we propose a Markov Decision Process and find an optimal policy through a
+Monte Carlo Tree Search REINFORCE algorithm guiding us to a profitable
+$n$-cyclic arbitrage walk based on the marginal exchange rates. The
+information of the found walk can be then piped back into to the nonlinear
+optimization problem to find an optimal trade in a timely manner.
 
-\addchap*{Abstract (German)}
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt
-ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo
-dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit
-amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor
+\selectlanguage{ngerman}
+\addchap*{Kurzfassung}
+Dezentrale Börsen (DEXs) sind eine neue Form von Finanzmärkten, die auf der
+Grundlage der Blockchaintechnologie entstehen. Durch sie entsteht ein
+wettbewerbsintensives und komplexes Umfeld des Maximal Extractable Value
+(MEV), in dem Akteure, sogenannte Searchers, gegen die Blockzeit antreten und
+miteinander konkurrieren, um profitable Gelegenheiten zu finden, wenn der
+Markt inaktiv ist und der nächste Block noch nicht bestätigt wurde. Eine
+dieser Gelegenheiten ist eine n-zyklische Arbitrage, auf die sich diese
+Arbeit konzentriert. Durch die Modellierung der Grundbausteine von DEXs, den
+Constant Function Market Makers (CFMMs), lässt sich ein nichtlineares
+Optimierungsproblem ableiten, das einen optimalen n-zyklischen Arbitrage
+Trade identifiziert. Dieses Optimierungsproblem gibt jedoch weder die\newline
+Ausführungsreihenfolge der Trades vor noch beschränkt es die Optimierung auf
+konkret genutzte DEXs. Um dies zu adressieren, schlagen wir einen Markow
+Entscheidungsproblem vor und ermitteln eine optimale Strategie mithilfe eines
+Monte Carlo Baum Suche REINFORCE Algorithmus, der uns anhand der
+Grenzwechselkurse zu einem profitablen n-zyklischen Arbitragepfad führt. Die
+Informationen des gefundenen Pfads können\newline anschließend in das
+nichtlineare Optimierungsproblem genutzt werden, um zeitnah einen optimalen
+Trade zu bestimmen.
+\selectlanguage{english}

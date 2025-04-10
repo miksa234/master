@@ -173,8 +173,10 @@ iteration the agent plays the network $N_{\text{play}}$ times until reaching
 a terminal state. Upon reaching a terminal state: the state, the action, the
 reward and the policy vector of the MCTS algorithm are saved. After the self
 play stage the model parameters are updated based on the self play data. We
-fully utilize the REINFORCE algorithm updates through \ref{alg: reinforce},
-where the loss function can be written as
+alter the Rollout-Simulation pahse of the MCTS algorithm by instead of doing
+one random rollout we do $N_{\text{sim}}$ number of rollouts. We fully
+utilize the REINFORCE algorithm updates through \ref{alg: reinforce}, where
+the loss function can be written as
 \begin{align}
     L(\theta) = -\frac{1}{N_{\text{batch}}}
     \sum_{i=1}^{N_{\text{batch}}}G_{i} y_i
@@ -210,8 +212,8 @@ a learning rate of $\alpha = 10^{-4} $, a weight decay of $\lambda =
 10^{-4}$, forgetting factors $\beta_1 = 0.9$, $\beta_2 = 0.999$ and
 $\varepsilon = 10^{-8}$ to prevent division by zero. We set the discount rate
 constant $\gamma = 0.98$ from REINFORCE \ref{alg: reinforce}. We use
-$N_{\text{batch} }=50$, $N_{\text{play}} = 1000$, $N_{\text{MCTS}} = 200$
-with $N_{\text{sim}}=500$ (MCTS simulations) with $1000$ iterations. The
+$N_{\text{batch} }=25$, $N_{\text{play}} = 200$, $N_{\text{MCTS}} = 100$
+with $N_{\text{sim}}=100$ (MCTS simulations) with $100$ iterations. The
 marginal exchange rates are pulled from the block range $t \in
 [18\cdot10^{6}, 21.8\cdot10^6]$. The number of residual block layers is
 $N=20$, these do not share weights. The UCB exploration-exploitation
@@ -241,6 +243,7 @@ self-play, a random block is sampled from which the marginal exchange rates
 are taken. Each state starts with the agent holding the WETH asset, from
 which the agent chooses a pool to conduct a swap with WETH to another token
 untill reaching a terminal state.
-
 \section{Result}
+Average reward on the dataset per iteration
+IMAGE HERE
 Calculations were performed using supercomputer resources provided by the Vienna Scientific Cluster (VSC)

@@ -80,7 +80,6 @@ def test_model():
     problem.model.share_memory()
     problem.model.eval()
 
-
 #    state = [(0, 0, 0), (0, 3, 2), (3, 5, 0), (5, 3, 4), (3, 0, 0)]
 #    actions = [(0, 4, 1) for _ in range(5)]
 #    data_list = [Data(
