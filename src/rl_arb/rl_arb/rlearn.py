@@ -148,9 +148,12 @@ class AgentRLearn():
 
         for block in np.unique(bs):
             idxs = np.where(bs==block)[0]
-            max_val = np.max(vs[idxs])
-            if block not in self.baseline_tracker or max_val > self.baseline_tracker[block]:
-                self.baseline_tracker[block] = max_val
+            mean_val = np.mean(vs[idxs])
+
+            if block not in self.baseline_tracker:
+                self.baseline_tracker[block] = mean_val
+            else:
+                self.baseline_tracker[block] = 1/2 * (mean_val + self.baseline_tracker[block])
 
             baseline[idxs] = self.baseline_tracker[block]
 
@@ -536,7 +539,7 @@ def train(rank, world_size, memory, mcts, iteration):
             for a, p in zip(actions, one_hot):
                 p[mcts.mdp.edge_list.index(a)] = 1
 
-            cross_entropy = torch.mean(policy_outs * one_hot)
+            cross_entropy = -torch.sum(policy_outs * one_hot)
             loss = torch.sum(cross_entropy * (value_targets - baseline))
 
             epoch_loss.append(loss.item())

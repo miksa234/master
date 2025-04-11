@@ -617,7 +617,7 @@ Where the constant to which the last equation is proportional to is the
 average length of an episode. The distribution $\mu$ is the on-policy
 distribution over the regular $\pi$ \cite[Chapter~9,10]{sutton_barto}, thus
 \begin{align}
-    \nabla J(\theta) \propto \mathbb{E}_\pi\left[
+    \nabla J(\theta) = \mathbb{E}_\pi\left[
         \sum_{a}Q_{\pi_{\theta}}(s_t, a)\nabla\pi_\theta(a|s_t)
     \right]
 \end{align}

@@ -21,13 +21,11 @@ ARGS_GAME = {
 
 ARGS_MODEL = {
     'in_channels': 4,
-    'emb_channels': 256,
-    'num_heads': 16,
-    'num_layers': 20,
-    'ff_dim': 1024,
-    'policy_mheads': 3,
-    'value_mheads': 3,
-    'value_layers': 3
+    'emb_channels': 128,
+    'num_heads': 4,
+    'num_layers': 4,
+    'ff_dim': 512,
+    'policy_mheads': 2,
 }
 
 ARGS_TRAINING = {

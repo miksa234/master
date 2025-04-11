@@ -1,13 +1,87 @@
 \chapter{Introduction}
-\begin{itemize}
-    \item  Background on the topic (MEV, Blockchain, proposing, decentralization).
-    \item Talk about what I did in the thesis and what are the results
-    \item mention that the optimization problem for the n-cyclic arbitrage
-        does not say to us in what order the trades should be done, also
-        searches the whole space instead of only the selected few.
-    \item Talk about the time constraint difficulty and opting for a RL based
-        approach because of the time and search space constraint.
-    \item introduce every chapter briefly
-\end{itemize}
-Some text belongs here here is a filler
+Maximal Extractable Value (MEV) sometimes also called Miner Extractable Value
+or Block Proposer Extractable Value refers to the maximal value that can be
+extracted from block production (excluding block reward and gas fees), by
+including, excluding and changing the order of transactions in a block and
+thereby creating an economic gain. The opportunities among others include
+arbitrage, frontrunning and liquidations. By definition MEV exists on any
+decentralized blockchain but, however this thesis primarily focuses on the
+application found on the Ethereum blockchain but everything can be applied to
+other blockchains with smart contract functionality. Maximizing MEV
+extraction requires sophisticated technicalities, custom software and
+high-end hardware making it more likely for institutional centralized
+entities to outperform individuals. The centralization is a threat to the
+most important quality of blockchain technology, decentralization. There are
+multiple proposals how to combat MEV centralization, however solutions that
+evolve completely removing MEV from the picture close one door but open
+multiple other ones.
+\newline
+Instead the Ethereum-Foundation \cite{ethereum_foundation} and Flashbots
+\cite{flashbots} implemented a reshape of MEV economics through the
+Proposer-Builder-Separation (PBS) \cite{proposer_builder_sep}. In short the
+PBS splits the MEV reward through multiple entities each playing a distinct
+role in the ecosystem. The Searchers capture the bulk the MEV profits, they
+identify the opportunities and commit bundle transactions to exploit them.
+The Block Builders construct the blocks by including, excluding and
+optimizing a set of selected transactions to produce most profitable blocks.
+They earn a share of MEV from the Searchers, which are committing bids to the
+Block-Builders to include the bundles. Block-Builders can also earn MEV
+directly by reordering transactions. The last entity that takes a direct cut
+of MEV are Validators/Proposers. They propose the most profitable block to
+the network and outsource block production to block builders via software
+like MEV-Boost \cite{flashbots}. They earn share of MEV by competing bids of
+Block-Builders to include their block. In multiple stages the PBS produces a
+highly competitive environment where the highest bid wins. Nevertheless, PBS
+is not a perfect solution. There have been cases where in one month, $80\%$
+of the blocks have been produced by only two block builders.
+\newline
+In the scope of the Ethereum blockchain, this thesis is primarily applicable
+for Searchers. The aim of the thesis is to give contribution to the
+decentralization of MEV by `laying it out in the open'.
+\newline
+We focus on a specific opportunity arising from an emerging form of financial
+markets, implemented on Decentralized Exchanges (DEXs). In comparison to
+traditional markets based on Order books and centralized liquidity market
+makers, the DEXs are based on Automated Market Makers (AMMs) and
+decentralized liquidity providers. AMMs, specifically Constant Function
+Market Makers (CFMMs) use a trading function and set of rules to
+automatically enable trading and liquidity provision for any user
+satisfying the rules. The opportunity in question in this thesis is an
+$n$-cyclic arbitrage over multiple DEXs, in which an optimized sequence of
+trades on $n$ distinct DEXs is executed. The sequence starts from one
+specific asset, executes the trades ending on that same asset with a balance
+greater then when started. We model CFMMs to construct an optimization
+problem that maximizes the profit of an $n$-cyclic arbitrage. In this
+scenario Searcher races against the block time trying to solve a
+multiple of these optimization problems. But when the clock turns and a new
+block is included the market equilibrium changes and the optimization problem
+becomes obsolete. One of the improvements in this case is to make a convex
+optimization problem. The original implementation allows for a convex
+relaxation, we can show that the relaxation has the same optimum as the
+original. This allows us to utilize more efficient convex solvers.
+\newline
+There are two further problems with the proposed optimization problem, which
+can be solved through one solution. The current model optimizes a trade
+vector over a set of DEXs, yet there are currently around $4 \cdot 10^{5}$
+DEXs deployed on UniswapV2 and UniswapV3 \cite{uniswap} not counting other
+implementations. It would be extremely inefficient to optimize over all of
+these DEXs, it would still be inefficient and it would also be unprofitable
+to optimize on a restriction of a much smaller set DEXs. The second problem
+is that the optimal trade vector does not specify in which order the trades
+should be executed. We propose a solution to these problems by finding a
+specific walk on a highly connected graph of DEXs. The graph, has nodes
+representing assets traded on the DEXs. These nodes are connected by an edge
+if the underlying assets can be traded through a liquidity pool. The weights
+of the edges are the so called marginal exchange rates. The goal is to find a
+walk starting and ending at the same node, maximizing the product of the
+marginal exchange rates without repeating an edge. The information of this
+optimal walk can then be used to construct the convex optimization problem
+and execute the trade by the chronology of the walk. Any brute force,
+depth/breath-first-search solution would take too long, hence we propose a
+Markov Decision Process representing the walk optimization. We find an
+optimal policy through a modified policy gradient method, specifically a
+variation of the Monte Carlo Tree Search REINFORCE \cite{sutton_barto}
+algorithm inspired by AlphaZero \cite{alphazero}.
+\newline
+The chapter outline of the thesis is the following.
 
