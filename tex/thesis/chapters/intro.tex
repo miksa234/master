@@ -84,4 +84,38 @@ variation of the Monte Carlo Tree Search REINFORCE \cite{sutton_barto}
 algorithm inspired by AlphaZero \cite{alphazero}.
 \newline
 The chapter outline of the thesis is the following.
+\newline
+In the second chapter we
+go through the background on first order optimality conditions for
+constrained nonlinear optimization problems based on \cite{bot_optimization}.
+Through the characterization of optimal solutions based on tangent
+cones, we can show that an optimal solution, under certain constraint qualifications
+implies existence to the Lagrange multipliers satisfying the Karush-Kuhn-Tucker
+(KKT) conditions. These conditions are necessary for optimality . In the case
+where the objective function and the inequality restrictions convex, and the
+equality restrictions affine linear, we can apply the Slater constraint
+qualification. Under this assumption the KKT conditions are both necessary
+and sufficient for optimality.
+\newline
+In the third chapter we model DEXs through
+CFMMs. By gradually building the foundations of general trades we can
+construct an optimization problem optimizing a trade over one CFMM. We can
+show that the convex relaxation of the problem, where we relax the equality
+constraints to inequality constraints, has the same optimal solution as the
+original. We can inductively increase the number of CFMMs for which we
+optimize a trade vector, giving a general optimization problem for a
+$n$-cyclic arbitrage. In the
+\newline
+In the fourth chapter we give a brief introduction on Markov Decision
+Processes (MDPs), Graph Neural Networks (GNNs), Monte Carlo Tree Search
+(MCTS) and an episodic policy gradient method called REINFORCE. All of these
+will be utilized for construction of the algorithm used to train the policy
+parametrized by a deep graph neural network for finding an $n$-cyclic
+arbitrage walk.
+\newline
+In the fifth and final chapter we model the underlying MDP of finding the
+$n$-cyclic arbitrage walk. We describe the specific architecture of GNN
+parametrizing the policy and the implementation of a modified REINFORCE MCTS
+parameter updates. Lastly we give an overview of the results of the policy
+optimization.
 

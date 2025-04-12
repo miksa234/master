@@ -157,6 +157,7 @@ class AgentRLearn():
 
             baseline[idxs] = self.baseline_tracker[block]
 
+
         return baseline*np.array(gamma_factors)
 
 
@@ -241,15 +242,19 @@ class AgentRLearn():
                 join=True
             )
 
+
+            with open(f"./baseline/baseline_{iteration}.pickle", "wb") as f:
+                pickle.dump(self.baseline_tracker, f)
+
             with open("values.pickle", "wb") as f:
                 pickle.dump(self.values, f)
 
             test_values = self.test_model(iteration)
+            self.test_values.append(test_values)
             average_value = float(np.mean(test_values))
             with open("test_values.pickle", "wb") as f:
-                pickle.dump(test_values, f)
+                pickle.dump(self.test_values, f)
 
-            logger.info(values)
             send_telegram_message(f"Average profit {average_value}")
 
             #if self.avg_itr_value[-1] > average_value:

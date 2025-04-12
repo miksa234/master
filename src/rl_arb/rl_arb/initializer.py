@@ -141,6 +141,8 @@ class Initializer():
         if not os.path.exists('./model'):
             os.mkdir('./model')
 
+        if not os.path.exists('./baseline'):
+            os.mkdir('./baseline')
 
         self.pools = pools
         self.tokens = tokens
