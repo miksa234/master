@@ -60,7 +60,7 @@ async fn main() -> Result<()> {
 //    ).await.unwrap();
 //
     let filtered_pools = load_pools_from_file(
-        Path::new("../data/pools/pools_deg_5_liq_100_block_18_paths_2.csv"),
+        Path::new("../data/pools/pools_deg_5_liq_100_block_18_grad.csv"),
     ).unwrap();
 
     let tokens = load_tokens_from_file(
@@ -80,7 +80,7 @@ async fn main() -> Result<()> {
         p_from_block,
         p_to_block,
         block_gap,
-        Path::new("../data/prices/prices_deg_5_liq_100_block_18_paths_2_gap_12h.parquet")
+        Path::new("../data/prices/prices_deg_5_liq_100_block_18_grad.parquet")
     ).await.unwrap();
 
     info!("Done len prices: {:?}", prices.len());

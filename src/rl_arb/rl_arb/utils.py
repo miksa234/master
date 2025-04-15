@@ -194,7 +194,15 @@ def filter_pools_with_no_gradient(pools, prices):
         t0 = pool['token0']
         t1 = pool['token1']
         p = make_price(prices[prices['pool_address'] == pool['address']])
-        mask.append(np.count_nonzero(np.gradient(p)) > ticks*2//3 )
+
+        pbn = len(list(
+            prices[prices['pool_address'] == pool['address']]['block_number']
+        ))
+        if pbn != ticks or np.count_nonzero(np.gradient(p)) < ticks*2//3:
+            mask.append(False)
+        else:
+            mask.append(True)
+
 
     pools = pools[mask]
     prices = prices[prices['pool_address'].isin(list(pools['address']))]

@@ -30,6 +30,7 @@ ARGS_MODEL = {
 
 ARGS_TRAINING = {
     'C': 1.4,
+    'num_reinforce': 100000,
     'num_iterations': 100,
     'num_searches': 100,
     'num_rollouts': 100,

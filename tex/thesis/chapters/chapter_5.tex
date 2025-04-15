@@ -83,9 +83,9 @@ origin node. All together the agent is rewarded by
 \begin{align}
     r(s_t) =
     \begin{cases}
-        \max\left\{0, \sum_{w_{ij}^{k}  \in s_t}\ln(w_{ij}^{k} \cdot \tau)\right\}  \quad
-        &\text{terminal state and reached the
-        origin node}\\
+        \sum_{w_{ij}^{k}  \in s_t}\ln(w_{ij}^{k} \cdot \tau)  \quad
+        &\text{terminal state}\\
+            -1 \quad &\text{no valid actions}\\
             0 \quad &\text{else},
     \end{cases}
 \end{align}
@@ -129,12 +129,12 @@ Given a state $s$ the input to the policy parametrization will be encoded
 through graph as stated in the list above. The architecture of the deep GNN
 parametrization of the policy is as follows. Given the node attributes, the
 encoder computes the node embeddings $h_i^{0}$ for all nodes $i$ through a
-learned liner projection to dimension $d_h = 256$. The embeddings are then
+learned liner projection to dimension $d_h = 128$. The embeddings are then
 updated via. $N$ Residual Multihead Attention Layers \cite{gatv2}. Each layer
-consists of two sublayers, a multihead attention layer (GAT) with $16$ heads,
+consists of two sublayers, a multihead attention layer (GAT) with $4$ heads,
 for message passing between the nodes which is flattened by a linear
 connection back to the original dimension $d_h$. And a node-wise fully
-connected feed-forward layer (FF) with $1024$ hidden dimension. Both
+connected feed-forward layer (FF) with $512$ hidden dimension. Both
 sublayers have a Batch Norm (BN) and a residual connection similar to
 \cite{rl_coopt}. The following is a formalization of the residual block
 \begin{align}
@@ -151,7 +151,7 @@ the vector
 \end{align}
 where $\|$ is the concatenation operator. The contextual embeddings
 $h^{(c)}_i$ are passed into the policy head. The policy head consists of
-GAT layer with $16$ heads passed to a Batch Norm layer and ultimately
+GAT layer with $4$ heads passed to a Batch Norm layer and ultimately
 compressed down to an output dimension of $2$ per node through a linear
 connection with Relu activation function
 \begin{align}
@@ -173,34 +173,42 @@ iteration the agent plays the network $N_{\text{play}}$ times until reaching
 a terminal state. Upon reaching a terminal state: the state, the action, the
 reward and the policy vector of the MCTS algorithm are saved. After the self
 play stage the model parameters are updated based on the self play data. We
-alter the Rollout-Simulation pahse of the MCTS algorithm by instead of doing
+alter the Rollout-Simulation parse of the MCTS algorithm by instead of doing
 one random rollout we do $N_{\text{sim}}$ number of rollouts. We fully
 utilize the REINFORCE algorithm updates through \ref{alg: reinforce}, where
 the loss function can be written as
 \begin{align}
     L(\theta) = -\frac{1}{N_{\text{batch}}}
-    \sum_{i=1}^{N_{\text{batch}}}G_{i} y_i
+    \sum_{i=1}^{N_{\text{batch}}}\left( G_{i}-B(b_i, s^{b_i}_{i_{t}}) \right)y_i
     \ln \pi_{\theta} (s^{b_i}_{i_t}),
 \end{align}
 where $G_i$ is the sum of the rewards as in the REINFORCE algorithm, and
 $y_i$ a one hot vector with $1$ at the index of the action taken at the end
-of an MCTS. The action taken at the end of an MCTS is determined by the MCTS
-improved policy $\pi^{\text{MCTS}}$. The $Q$ values are estimated through the
-MCTS and parametrized policy $\pi_\theta$ search. The full reinforcement
-learning algorithm algorithm in pseudo-code is the following
+of an MCTS. We utilize a baseline function $B(b_i)$ dependent on the block
+$b_i$. During the training we gather the rewards of each block, we then
+compute the average and multiply it by the discount factor $\gamma$ with
+exponent dependant on the state $s^{b_i}_{i_t}$ as per $G_i$. E.g. the first
+state of an episode the exponent would be $T$ and at the last one $1$.
+\newline
+The action taken at the end of an MCTS is determined by the MCTS improved policy
+$\pi^{\text{MCTS}}$. The $Q$ values are estimated through the MCTS and
+parametrized policy $\pi_\theta$ search. The full reinforcement learning
+algorithm algorithm in pseudo-code is the following
 \begin{algorithm}[H]
 \caption{RL Algorithm}\label{alg: rl_alg}
     \begin{algorithmic}
         \While{within computational budget}
         \For {$i=1,\ldots, N_{\text{play}}$}
-            \State Initialize state $s_0 = s$ at block $b$
-            \While{not terminal}
-            \State $\pi^{MCTS}(s)  \gets \text{MCTS}(s)$
-            \State  $s \gets \argmax_{a}\pi^{MCTS}(a|s) $
-            \State save $s$, $\pi^{\text{MCTS}}(s)$ and $a$
-            \EndWhile
+            \For {$i=1,\ldots, N_{\text{batch}}$}
+                \State Initialize state $s = s_0$ at block $b \sim \text{Uniform}(B)$
+                \While{not terminal}
+                \State $\pi^{MCTS}(s)  \gets \text{MCTS}(s)$
+                \State  $s \gets a \sim \pi^{MCTS}(s) $
+                \State save $s$, $\pi^{\text{MCTS}}(s)$ and $a$
+                \EndWhile
+            \EndFor
+            \State $\theta \gets Adam(\nabla L(\theta))$
         \EndFor
-        \State $\theta \gets Adam(\nabla L(\theta))$
         \EndWhile
     \end{algorithmic}
 \end{algorithm}
@@ -212,11 +220,11 @@ a learning rate of $\alpha = 10^{-4} $, a weight decay of $\lambda =
 10^{-4}$, forgetting factors $\beta_1 = 0.9$, $\beta_2 = 0.999$ and
 $\varepsilon = 10^{-8}$ to prevent division by zero. We set the discount rate
 constant $\gamma = 0.98$ from REINFORCE \ref{alg: reinforce}. We use
-$N_{\text{batch} }=25$, $N_{\text{play}} = 200$, $N_{\text{MCTS}} = 100$
-with $N_{\text{sim}}=100$ (MCTS simulations) with $100$ iterations. The
-marginal exchange rates are pulled from the block range $t \in
-[18\cdot10^{6}, 21.8\cdot10^6]$. The number of residual block layers is
-$N=20$, these do not share weights. The UCB exploration-exploitation
+$N_{\text{batch} } = 25$, $N_{\text{play}} = 200$, $N_{\text{MCTS}} = 100$
+with $N_{\text{sim}}=100$ (rollout simulations for value estimation) with
+$100$ iterations. The marginal exchange rates are pulled from the block range
+$t \in [18\cdot10^{6}, 21.8\cdot10^6]$. The number of residual block layers
+is $N=4$, these do not share weights. The UCB exploration-exploitation
 parameter $C$ in the MCTS algorithm for choosing the next child in the tree
 is set to $C=1.4$.
 \section{Data}
@@ -232,8 +240,8 @@ been created before block $18\cdot10^{6}$ and secondly we use a degree
 filter. Assets which have a smaller degree then $4$ are filtered out. The
 question still remains if these pools are still in use currently. Hence, the
 pools with low liquidity are also filtered out, by looking at their two token
-reserves, the $\text{ETH}$ value of the reserves is crucial here. If the
-reserve is worth less then $100\; \text{ETH} $ it is filtered out. We also
+reserves, the $\text{WETH}$ value of the reserves is crucial here. If the
+reserve is worth less then $100\; \text{WETH} $ it is filtered out. We also
 look at the gradient of the marginal exchange rates for all the pools, and
 filter out the pools with low price change. For the training process the
 marginal exchange rates of the pools are extracted from block $18\cdot10^{6}$
@@ -242,8 +250,48 @@ $12$ hours ($\sim12s$ is the time until the next block). During each
 self-play, a random block is sampled from which the marginal exchange rates
 are taken. Each state starts with the agent holding the WETH asset, from
 which the agent chooses a pool to conduct a swap with WETH to another token
-untill reaching a terminal state.
-\section{Result}
-Average reward on the dataset per iteration
-IMAGE HERE
-Calculations were performed using supercomputer resources provided by the Vienna Scientific Cluster (VSC)
+until reaching a terminal state.
+\section{Results}
+Firstly we will look at the pure REINFORCE method on one block. We just apply
+the Algorithm from \ref{alg: reinforce} on the MDP. Instead of updating each
+episode, we gather $N_\text{batch}=100$ episode batches to update the model
+weights. Figure \ref{fig: reinforce} shows the progress. Sub-figure
+\ref{fig: suc_states} shows the number of successful states per epoch. We
+label a successful state if the states has reached the origin node at the end
+of the walk. After about $60$ epochs the GNN learns to reach the origin node
+rapidly. Sub-figure \ref{fig: avg_rewards} shows the average rewards per
+epoch, correlating with the successful states. The problem however is that
+the agents gets stuck at a local optimum and does not reach a maximal reward
+of $r_\text{max}= 0.11$, rather pivots at $r_\text{agent} = 0.0015$.
+\begin{figure}[H]
+   \centering
+    \begin{subfigure}{.5\textwidth}
+      \centering
+       \includegraphics[width=\linewidth]{./pics/reinforce_suc_states.png}
+       \caption{Successful states \label{fig: suc_states}}
+    \end{subfigure}%
+    \begin{subfigure}{.5\textwidth}
+      \centering
+       \includegraphics[width=\linewidth]{./pics/reinforce_rewards.png}
+       \caption{Average rewards \label{fig: avg_rewards}}
+    \end{subfigure}
+    \caption{REINFORCE on one block \label{fig: reinforce}}
+\end{figure}
+With the help of the exploration-exploitation randomization of the MCTS and a
+baseline we can avoid the local optimum. Bellow, Figure \ref{fig: validation}
+shows the validation error of each epoch of training the REINFORCE with MCTS
+algorithm. The true true optimal values are calculated by a
+Depth-First-Search on the MDP and compared to the values produced by model at
+each epoch on $100$ different blocks (price data), which do not change
+throughout. The Depth-First-Search needs on average $0.4s$ to find the best
+walk, and REINFORCE with MCTS $0.2s$, thus preforming twice as fast on a
+local machine without GPU acceleration. In total this time difference might
+seem small but would give an edge to a Searcher in a last second call.
+\begin{figure}[H]
+   \centering
+   \includegraphics[width=0.8\textwidth]{./pics/mcts_reinforce_validation_error.png}
+   \caption{Validation error, REINFORCE with MCTS}
+   \label{fig: validation}
+\end{figure}
+Calculations were performed using supercomputer resources provided by
+the Vienna Scientific Cluster (VSC)

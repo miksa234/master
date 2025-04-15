@@ -218,6 +218,7 @@ class Node:
                 self.value_best = value
 
 
+
 class MCTS:
     """
     A class representing the Monte Carlo Tree Search (MCTS) algorithm.
@@ -309,6 +310,14 @@ class MCTS:
             action_probs[
                 self.mdp.edge_list.index(child.action_taken)
             ] = child.value_best
+
+        if sum(action_probs) == 0:
+            for child in root.children:
+                action_probs[
+                    self.mdp.edge_list.index(child.action_taken)
+                ] = child.visit_count
+
+
         action_probs /= np.sum(action_probs)
 
         return action_probs

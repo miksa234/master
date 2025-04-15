@@ -6,12 +6,13 @@ from torch.nn import functional as F
 from torch_geometric.data import Batch, Data
 import torch.multiprocessing as mp
 from tqdm.contrib.telegram import tqdm
-import logging
-logger = logging.getLogger('rl_circuit')
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch import distributed as dist
 import os
 import pickle
+
+import logging
+logger = logging.getLogger('rl_circuit')
 
 from rl_arb.net import PolicyNet
 from rl_arb.mcts import MCTSParallel, PMemory
@@ -61,7 +62,6 @@ class AgentRLearn():
         self.avg_itr_value = [0.0]
         self.test_values= []
 
-
     def self_play(self):
         """
         Executes self-play to generate training data.
@@ -97,10 +97,11 @@ class AgentRLearn():
             for i in range(len(p_memory))[::-1]:
                 mem = p_memory[i]
                 probs = np.zeros(len(self.mcts.mdp.edge_list))
+
                 for child in mem.root.children:
                     probs[
                         self.mcts.mdp.edge_list.index(child.action_taken)
-                    ] = child.q_value
+                    ] = child.value_best
 
                 if np.sum(probs) == 0:
                     for child in mem.root.children:
@@ -116,14 +117,13 @@ class AgentRLearn():
                     mem.current_block
                 ))
 
-                action_idx = np.random.choice(
-                    list(range(len(self.mcts.mdp.edge_list))),
-                    p=probs
-                )
-                action = self.mcts.mdp.edge_list[action_idx]
+                action = self.mcts.mdp.edge_list[np.random.choice(len(probs), p=probs)]
                 mem.state = self.mcts.mdp.get_next_state(mem.state, action)
 
-                value, is_terminal = self.mcts.mdp.get_value_and_terminated(mem.state, mem.current_block)
+                value, is_terminal = self.mcts.mdp.get_value_and_terminated(
+                    mem.state,
+                    mem.current_block
+                )
 
                 if is_terminal:
                     if self.pbar_play:
@@ -242,7 +242,6 @@ class AgentRLearn():
                 join=True
             )
 
-
             with open(f"./baseline/baseline_{iteration}.pickle", "wb") as f:
                 pickle.dump(self.baseline_tracker, f)
 
@@ -256,11 +255,6 @@ class AgentRLearn():
                 pickle.dump(self.test_values, f)
 
             send_telegram_message(f"Average profit {average_value}")
-
-            #if self.avg_itr_value[-1] > average_value:
-            #    self.override_update(iteration)
-            #else:
-            #    self.avg_itr_value.append(average_value)
 
         if self.args['telegram']:
             send_telegram_message("DONE!")
@@ -279,26 +273,18 @@ class AgentRLearn():
         self.model.share_memory()
         self.mcts.mdp.device = cpu
         # multicore self-play
-        play_iter = self.mcts.mdp.num_blocks-1
+        play_iter = self.args['num_self_play_iterations']
         num_parallel = self.args['num_parallel']
         num_processes = play_iter//num_parallel
         per_processor = play_iter//num_parallel//num_processes
 
-        block_ranges = [
-            list(range(num_parallel)),
-            list(range(num_parallel, (num_parallel*num_processes)//2 -1)),
-            list(range((num_parallel*num_processes)//2, play_iter-num_parallel)),
-            list(range(play_iter-num_parallel, play_iter)),
-        ]
-        logger.info(f"{block_ranges}")
-
         with mp.Pool(processes=num_processes) as pool:
             results = pool.starmap(
                 test_blocks,
-                [(self, block_ranges[0], per_processor, 'cuda:0', True)] +\
-                [(self, block_ranges[1], per_processor, 'cuda:0', False) for _ in range(num_processes//2 - 1)] +\
-                [(self, block_ranges[2], per_processor, 'cuda:1', False) for _ in range(num_processes//2 - 1)] +\
-                [(self, block_ranges[3], per_processor, 'cuda:1', True)]
+                [(self, per_processor, 'cuda:0', True)] +\
+                [(self, per_processor, 'cuda:0', False) for _ in range(num_processes//2 - 1)] +\
+                [(self, per_processor, 'cuda:1', False) for _ in range(num_processes//2 - 1)] +\
+                [(self, per_processor, 'cuda:1', True)]
             )
             pool.terminate()
 
@@ -308,7 +294,7 @@ class AgentRLearn():
 
         return values
 
-    def test_play(self, block_range):
+    def test_play(self):
         """
         Executes self-play to generate training data.
 
@@ -319,7 +305,7 @@ class AgentRLearn():
             value estimates, and block indices.
         """
         return_mem = []
-        p_memory = [PMemory(self.mcts.mdp, block) for block in block_range]
+        p_memory = [PMemory(self.mcts.mdp, np.random.choice(self.mcts.mdp.num_blocks)) for _ in range(self.args['num_parallel'])]
 
         if self.pbar_play:
             pbar = tqdm(
@@ -337,13 +323,14 @@ class AgentRLearn():
                 pbar.set_description(f"test_play state_len {len(states[0])}")
 
             self.mcts.search(self.model, states, p_memory)
+
             for i in range(len(p_memory))[::-1]:
                 mem = p_memory[i]
                 probs = np.zeros(len(self.mcts.mdp.edge_list))
                 for child in mem.root.children:
                     probs[
                         self.mcts.mdp.edge_list.index(child.action_taken)
-                    ] = child.q_value
+                    ] = child.value_best
 
                 if np.sum(probs) == 0:
                     for child in mem.root.children:
@@ -353,15 +340,13 @@ class AgentRLearn():
 
                 probs /= np.sum(probs)
 
-                action_idx = np.random.choice(
-                    list(range(len(self.mcts.mdp.edge_list))),
-                    p=probs
-                )
-
-                action = self.mcts.mdp.edge_list[action_idx]
+                action = self.mcts.mdp.edge_list[np.argmax(probs)]
                 mem.state = self.mcts.mdp.get_next_state(mem.state, action)
 
-                value, is_terminal = self.mcts.mdp.get_value_and_terminated(mem.state, mem.current_block)
+                value, is_terminal = self.mcts.mdp.get_value_and_terminated(
+                    mem.state,
+                    mem.current_block
+                )
 
                 if is_terminal:
                     if self.pbar_play:
@@ -391,9 +376,9 @@ class AgentRLearn():
         torch.save(optimizer.state_dict(), f"./model/optimizer_{iteration+1}.pt")
 
 
-def test_blocks(rlearn, block_range, times=100, device='cpu', pbar=False):
+def test_blocks(rlearn, times=100, device='cpu', pbar=False):
     """
-    Helper function to perform self-play multiple times.
+    Helper function to perform self-play multiple times while testing.
 
     Parameters
     ----------
@@ -409,16 +394,16 @@ def test_blocks(rlearn, block_range, times=100, device='cpu', pbar=False):
     Returns
     -------
     list
-        A list of tuples containing mdp states, policy probabilities, value estimates, and block indices.
+        A list of tuples containing the rewards.
     """
-    profits = []
+    values = []
 
     rlearn.pbar_play = pbar
     rlearn.model.to(device)
     rlearn.mcts.mdp.device = device
-    for _ in range(times):
-        profits += rlearn.test_play(block_range)
-    return profits
+    for i in range(times):
+        values += rlearn.test_play()
+    return values
 
 
 def self_play_num_times(rlearn, times=100, device='cpu', pbar=False):
@@ -544,8 +529,8 @@ def train(rank, world_size, memory, mcts, iteration):
             for a, p in zip(actions, one_hot):
                 p[mcts.mdp.edge_list.index(a)] = 1
 
-            cross_entropy = -torch.sum(policy_outs * one_hot)
-            loss = torch.sum(cross_entropy * (value_targets - baseline))
+            cross_entropy = torch.sum(torch.log(policy_outs) * one_hot, dim=1)
+            loss = -torch.mean(cross_entropy * (value_targets - baseline))
 
             epoch_loss.append(loss.item())
             avg_rewards.append(value_targets.mean().item())
@@ -553,9 +538,9 @@ def train(rank, world_size, memory, mcts, iteration):
                 np.mean(np.array([len(s) for s in states]))
             )
 
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            optimizer.zero_grad()
 
         if mcts.args['telegram'] and rank == 0:
             update_me(

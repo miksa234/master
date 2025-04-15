@@ -667,11 +667,11 @@ Furthermore we can generalize the gradient updates to include a baseline
 function $b(s)$ \cite[Chapter~13.4]{sutton_barto}, instead of updating $G_t$
 we centralize the rewards by
 \begin{align}
-    G_t - b(s_t),
+    G_t - B(s_t),
 \end{align}
-giving a much better performance. This is called the REINFORCE with baseline
-algorithm and there are a verity of options when construing the baseline
-function, some work better then others.
+where $B$ is a baseline function, giving a faster convergence. This is
+called the REINFORCE with baseline algorithm and there are a verity of
+options when construing the baseline function, some work better then others.
 \section{REINFORCE with MCTS\label{sec: gen}}
 In this section we give a brief overview of how we can utilize MCTS with
 REINFORCE. Instead of doing a one-per-one episode, we are going
@@ -731,12 +731,14 @@ node, $r_c$ is the estinaded reward of the child from the simulation phase
 and the current state and $b_p$ is the best value of the parent.
 \newline
 
-After an MCTS search we get the so called MCTS improved policy at state $s$
+After an MCTS search we get the MCTS improved policy at state $s$
 for action $a$,
 \begin{align}
     \pi^{\text{MCTS}}(a|s) = \frac{Q(s, a)}{\sum_{a'}Q(s, a')}
 \end{align}
-We choose the action with the highes probability
+We sample the action based on the probability distribution $\pi^\text{MCTS}
+(s)$ while training to avoid the policy becomming deterministic or choose the
+action with the highes probability by
 \begin{align}
     a = \argmax_a \pi^{\text{MCTS}}(a|s),
 \end{align}

@@ -59,6 +59,10 @@ def run():
         problem = Initializer()
         problem.rlearn.learn(problem.optimizer)
 
+    elif sys.argv[1] == "reinforce":
+        problem = Initializer()
+        problem.reinforce.learn()
+
     elif sys.argv[1] == "info":
         problem = Initializer()
         print_summary(problem)

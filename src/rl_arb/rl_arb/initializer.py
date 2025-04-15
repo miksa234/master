@@ -7,6 +7,7 @@ import numpy as np
 import torch
 from torch_geometric.data import Data
 import logging
+
 logger = logging.getLogger('rl_circuit')
 import torch.multiprocessing as mp
 try:
@@ -16,8 +17,9 @@ except RuntimeError:
 
 from rl_arb.mdp import MDP
 from rl_arb.mcts import MCTS
-from rl_arb.net import PolicyNet, ValueNet
+from rl_arb.net import PolicyNet
 from rl_arb.rlearn import AgentRLearn
+from rl_arb.reinforce import Reinforce
 from rl_arb.config import (
     DEVICE,
     ARGS_GAME,
@@ -73,7 +75,7 @@ class Initializer():
             '../data/tokens/tokens.csv',
         )
         prices = pd.read_parquet(
-            '../data/prices/prices_deg_5_liq_100_block_18.parquet'
+            '../data/prices/prices_deg_5_liq_100_block_18_grad.parquet'
         )
         pools, prices = filter_pools_with_no_gradient(pools, prices)
 
@@ -99,8 +101,9 @@ class Initializer():
             inverse_weights = [1/el for el in d['weight']]
             G.add_edge(t1, t0, k=d['k'], weight=inverse_weights, address=d['address'])
 
+
         edge_list = [list(e) for e in L.edges()]
-        rates = np.array([np.log(e[-1]['mexr']) for e in L.nodes(data=True)]).T
+        rates = np.array([np.log(n[1]['mexr']) for n in L.nodes(data=True)]).T
         used = [0 for _ in range(len(L.nodes))]
         t0_using = [0 for _ in range(len(L.nodes))]
         t1_using = [0 for _ in range(len(L.nodes))]
@@ -115,28 +118,14 @@ class Initializer():
             ARGS_MODEL
         ).share_memory().to(DEVICE)
 
-
-#        model.load_state_dict(
-#            torch.load(
-#                "./model/model_3.pt",
-#                weights_only = True,
-#                map_location=DEVICE
-#            )
-#        )
-
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-4)
-#        optimizer.load_state_dict(
-#            torch.load(
-#                "./model/optimizer_3.pt",
-#                weights_only = True,
-#                map_location=DEVICE
-#            )
-#        )
         optimizer.zero_grad()
 
         mcts = MCTS(mdp, ARGS_TRAINING, model)
 
         rlearn = AgentRLearn(model, mdp, ARGS_TRAINING)
+
+        reinforce = Reinforce(model, optimizer, mdp, mcts, ARGS_TRAINING)
 
         if not os.path.exists('./model'):
             os.mkdir('./model')
@@ -158,4 +147,5 @@ class Initializer():
         self.model = model
         self.optimizer = optimizer
         self.rlearn = rlearn
+        self.reinforce = reinforce
         self.mcts = mcts # not parallel version
