@@ -1,17 +1,16 @@
-\chapter{Modeling Constant Function Market Makers (CFMM) \label{chap: cfmms}}
-On top of blockchain technology a new form of financial markets have found
+\chapter{Constant Function Market Makers\label{chap: cfmms}}
+On top of blockchain technology, a new form of financial markets has found
 its roots, they are called Decentralized Exchanges (DEXs). As in any
-financial market, DEXs allow agents to trade assets, in this case
-cryptocurrencies (digital assets) which we will refer throughout as an asset.
-Thorough a decentralized ledger stored copied on multiple computers
-(blockchain) the asset ownership is being tracked through a storage slot of a
-smart contract. All Agents holding an asset have a form of entry in the
-storage slot, equivalent to a database entry in the assets' smart contract
-with their wallet address and amount of asset. In this chapter we go through
-the underlying principles of DEXs and their properties by mathematical
-modeling and optimization to arrive at optimal trades and ultimately model
-arbitrage scenarios. In recent years a lot of groundwork on modeling has been
-done in \cite{cfmms_basics} and on optimal trades in
+financial market, DEXs allow agents to trade cryptocurrencies, which we will
+refer to throughout as an asset. Thorough a decentralized ledger, stored and copied
+on multiple computers (blockchain), the asset ownership is being tracked
+by a storage slot of a smart contract. All agents holding an asset have
+an entry in the storage slot, equivalent to a database entry in the
+asset's smart contract with their wallet address and an amount. In this
+chapter we go through the underlying principles of DEXs and their properties
+by mathematical modeling and optimization to arrive at optimal trades and
+ultimately model arbitrage scenarios. In recent years a lot of groundwork on
+modeling has been done in \cite{cfmms_basics} and on optimal trades in
 \cite{optimal_routing_cfmm}, on which this chapter is based on. We give an
 extensive description in a specific case of optimal arbitrage in a network of
 CFMMs all based on \cite{uniswap} and \cite{uniswapv3_paper}.
@@ -19,18 +18,21 @@ CFMMs all based on \cite{uniswap} and \cite{uniswapv3_paper}.
 \section{Basics}
 A DEX is governed by a constant function market maker (CFMM), which is a
 function $\varphi:\mathbb{R}^{n}_{+} \to \mathbb{R}_+$ the trading function
-and a set of conditions. Here $n \ge 2$ is the number of assets an agent can
-trade, these are labeled $\{1,\ldots, n\}$. The CFMM is a function of the
-reserves $y \in \mathbb{R}^{n}_+$, where $y_i \in \mathbb{R}_+$ is the
-reserve of asset $i \in \{1,\ldots,n\}$. The reserves are the defined
-liquidity of the DEX and lie in its portfolio. There are two underlying ways
+and a set of conditions. The conditions define the way an agent interacts
+with a DEX. Here $n \ge 2$ is the number of assets an agent can trade, these
+are labeled $\{1,\ldots, n\}$. The CFMM is a function of the reserves $y \in
+\mathbb{R}^{n}_+$, where $y_i \in \mathbb{R}_+$ is the reserve of asset $i
+\in \{1,\ldots,n\}$. The reserves are the liquidity of the DEX and generally
+lie in its smart contract portfolio. DEXs are also sometimes referred to
+simply as liquidity pools. It might sound confusing but the terms DEX, CFMM
+and liquidity pool can be used interchangeably. There are two underlying ways
 an agent can interact with the DEX:
 \begin{itemize}
     \item Change liquidity
     \item Trade
 \end{itemize}
-We will only look the trading interaction which lies in the scope of the aim
-of the thesis.
+We will only look at the trading interaction which lies in the scope of the
+thesis.
 \newline
 
 An agent initializes a trade on a DEX, in which a set amount of assets is
@@ -58,7 +60,7 @@ stays constant during the trade
 \begin{align}
     \varphi(y+\gamma x - \tilde{x}) = \varphi(y).
 \end{align}
-Depending on the CFMM, a trade has a fee $\gamma \in (0, 1]$, where
+Depending on the CFMM, a trade has a fee $\gamma \in (0, 1]$. Then
 $(1-\gamma)x$ of the set amount of given assets is distributed to liquidity
 providers as a compensation for providing liquidity. The discounted amount
 $\gamma x$ is actually being exchanged for $\tilde{x}$, but the reserves are
@@ -69,7 +71,6 @@ increasing and differentiable, as it is implemented by Uniswap
 \cite{uniswap}, Balancer \cite{balancer}, Sushiswap \cite{sushiswap}, CurveFI
 \cite{curvefi} and many others. Most of them are also positive homogenious
 $\varphi(\alpha y)=\alpha(y)$, for all $\alpha \ge 0$.
-
 \subsection{CFMMs Examples}
 The weighted sum trading function is
 \begin{align}
@@ -103,7 +104,7 @@ $\text{supp}(x)$ and $\text{supp}(\tilde{x})$
     \left(1 - \frac{\tilde{x}_j}{y_j}\right)^{w_j}
     &= 1.\label{eq: wm_trade_acceptance}
 \end{align}
-In the case we are trading only a one to one of these assets then we have
+In the case we are trading one for one of the tradeable assets, we have
 $|\text{supp}(x)| = |\text{supp}(\tilde{x})| = 1$. Let $i$ and $j$ be the
 corresponding indices of the giving and receiving asset then an analytic
 expression can be explicitly derived  for $x_i$ (or $\tilde{x}_j$) by taking
@@ -137,32 +138,33 @@ where $\sum_{i=1}^{n}w_i  = 1$, $w_i > 0$ and $\alpha \in [0,1]$. For $\alpha
 = 1$ the geometric weighted mean.
 
 \subsection{Concentrated Liquidity}
-Another implementation of CFMM are automated market makers with concentrated
-liquidity like UniswapV3 \cite{uniswapv3_paper}. The idea is to split
-liquidity provision from the whole sublevel set
-$\varphi(y +\gamma x-\tilde{x}) =\varphi(y)$ to multiple sets. The splitting
-is determined by ticks $\{p(i)\}_{i \in \mathbb{Z} }$ with the rate
-usually set to $p(i) = 1.0001^{i}$, where $p(i)$ is the so-called marginal
-exchange rate of the tick. Every tick range
+Another implementation of AMMs are CFMMs with concentrated liquidity like
+UniswapV3 \cite{uniswapv3_paper}. The idea is to split liquidity provision
+from the whole sublevel set $\varphi(y +\gamma x-\tilde{x}) =\varphi(y)$ to
+multiple smaller sets. The sets are determined by ticks $\{p(i)\}_{i \in
+\mathbb{Z} }$ with the rate usually set to $p(i) = 1.0001^{i}$, where $p(i)$
+is the so-called marginal exchange rate of the tick $i$. Every tick range
 \begin{align}
     (p(i), p(i+1)],
 \end{align}
 has its own reserves (liquidity) and  all of them are governed by a single
 trading function $\varphi$ depending on the liquidity bound by the tick
 range. The trade is executed in a specific tick range when the marginal
-exchange rate is in the this specific tick range, then the liquidity of the
-tick range is used for the trade. The liquidity providers specify an upper
-and a lower bound $(p(U), p(L)]$ and provide liquidity on depth $\tilde{k} =
-\varphi(y)$. They earn the fee of the trades, which is split by the weighted
-amount of liquidity provided in the tick range instead of on the whole
-trading curve.
+exchange rate is in the this specific tick range. Then the liquidity of this
+specific tick range is used for the trade.
+
+The liquidity providers specify an upper and a lower bound $(p(U), p(L)]$ and
+provide liquidity on a depth $\tilde{k} = \varphi(y)$. They earn the fee of
+the trades, which is split by the weighted amount of liquidity provided in
+the tick range by each liquidity provider instead of on the whole trading
+curve.
 
 When the marginal exchange rate raises above a trick range during the trade,
 the tick range is flipped to the next one and the rest of the trade is
 executed on the new tick range. This however is associated with more
 transaction cost for the agent conducting the trade.
 
-\section{First order approximations\label{sec: first_order_approx}}
+\section{First order approximations}
 For fix reserves $y \in \mathbb{R}_+^{n}$ let $\nabla \varphi(y) = P$ be the
 vector of unscaled prices. Note that $P$ is positive in all entries because
 $\varphi$ is by assumption increasing. The entries are given by the gradient
@@ -196,16 +198,17 @@ Thus, dividing by $P_n$
 also holds.
 Note that this is a first order approximation, similarly to a midpoint price
 in an order book. The actual trades are completely determined by the trade
-acceptance condition. It is an reassuring that the trade can approximated by
-the marginal exchange rates which is the usual intuition. In fact as we will
-later see by concavity of the trade function this will in an inequality.
+acceptance condition. It is an reassuring fact, that the trade can
+approximated by the marginal exchange rates which is the usual intuition. We
+will later see, that by concavity of the trade function this will hold in an
+inequality.
 \section{Swaps}
-The most common type of trade interaction with a DEX is a swap, i.e. a two
-asset trade. Denote these two assets with index $i$ and index $j$, then
+The most common type of trade interaction with a DEX is a swap, i.e. trading
+one asset for another. Denote these two assets with index $i$ and index $j$,
 $x=\delta e_i$, $\tilde{x}=\tilde{\delta} e_j$, where $\delta, \tilde{\delta}
 \in \mathbb{R}_+$ and $e_i,e_j$ are the canonical basis vectors of
 $\mathbb{R}^{n}$, $i \neq j$ (disjoint support). The trade acceptance
-condition is then
+condition in this case is
 \begin{align}
     \varphi(y + \gamma\delta e_i - \tilde{\delta}e_j) = \varphi(y).
     \label{eq: trade_acceptance_condition}
@@ -224,17 +227,17 @@ concavity we get that
       &\le \nabla_y \varphi(y) (\gamma\delta e_i - \tilde{\delta}e_j) \\
       &\le p_i \gamma \delta - p_j \tilde{\delta}.
 \end{align}
-Thus that
+Thus
 \begin{align}
     p_j \tilde{\delta} \le p_i \gamma \delta.
 \end{align}
 
-In this case it is natural to define this function $F: \mathbb{R}_+ \to
-\mathbb{R}$, and call it the forward exchange function. Where $F(\delta)$ is
-unique to one $\tilde{\delta}$. The function $F$ is objective for all valid
-trades, additionally the function is increasing since $\varphi$ is
-increasing. Also, $F$ is non-negative, because $F(0) = 0$ and it is concave.
-Use the implicit function theorem on the trade acceptance condition
+It is natural to define a function $F: \mathbb{R}_+ \to \mathbb{R}$, the
+forward exchange function. Where $F(\delta)$ is unique to one
+$\tilde{\delta}$. The function $F$ is defined for all valid trades.
+Additionally, it increasing since $\varphi$ is increasing. Also, $F$ is
+non-negative, because $F(0) = 0$ and it is concave. To show concavity we use
+the implicit function theorem on the trade acceptance condition
 \begin{align}
 f(\delta, \tilde{\delta}) = \varphi(y + \gamma\delta e_i -\tilde{\delta}e_j)
 - \varphi(y) =0,
@@ -256,12 +259,12 @@ e_i - F(\delta') e_j$ and note that $\varphi(y) = \varphi(y') = \varphi(y'')$
 as part of the trade acceptance condition. Since $\varphi$ is a concave
 function
 \begin{align}
-    \varphi(y'') \le \nabla_y\varphi(y')^{T} (y'' -y')+
+    \varphi(y'') \le \nabla\varphi(y')^{T} (y'' -y')+
     \varphi(y'),\label{eq: phi_concave}
 \end{align}
 or simply
 \begin{align}
-    \nabla_y\varphi(y')^{T} (y'' - y') \ge 0.
+    \nabla\varphi(y')^{T} (y'' - y') \ge 0.
 \end{align}
 We can insert for $y''$ and $y'$ to get
 \begin{align}
@@ -272,11 +275,11 @@ We can insert for $y''$ and $y'$ to get
     & F(\delta') \le F'(\delta)(\delta' - \delta) + F(\delta').
 \end{align}
 
-Respectively a definition of the reverse exchange function $G: \mathbb{R}_+
+Respectively we define the reverse exchange function $G: \mathbb{R}_+
 \to \mathbb{R} \cup {\infty}$, $G(\tilde{\delta})$ uniquely determined by
 $\delta$ satisfying the trade acceptance condition. If no such $\delta$
 exists then the function is mapped to $\{\infty\}$. The reverse exchange
-function is non-negative and increasing because of $\varphi$, but it unlike
+function is non-negative and increasing because of $\varphi$, but unlike
 the forward exchange function it is convex. To show convexity, we can again
 use the implicit function theorem and apply a similar argumentation to the
 forward exchange function, i.e.
@@ -296,7 +299,7 @@ G(\tilde{\delta}')e_i - \tilde{\delta}'e_j$  and use the concavity of the
 trading function $\varphi$ together with the trade acceptance condition to
 get
 \begin{align}
-    &\nabla_y \varphi(y')^{T} (y'' - y') \ge 0\\
+    &\nabla \varphi(y')^{T} (y'' - y') \ge 0\\
     &(G(\tilde{\delta}') - G(\tilde{\delta}))\partial_{y_i}\varphi(y')
     - (\tilde{\delta}' - \tilde{\delta})\partial_{y_j}\varphi(y') \ge 0\\
     &(G(\tilde{\delta}') - G(\tilde{\delta}))
@@ -325,14 +328,13 @@ reverse exchange functions are
     F(\delta) = \gamma \frac{p_i}{p_j}\delta \\
     F(\tilde{\delta}) = \frac{1}{\gamma} \frac{p_j}{p_i}\tilde{\delta},
 \end{align}
-TODO: Check NEWTON
 In the case there is no analytical expression for the forward and reverse
 exchange function we can compute the mapping numerically. Since the trade is
 uniquely defined by one variable either $\delta$ or $\tilde{\delta}$, we can
 fix one to compute a solution to the trade acceptance condition numerically
-\ref{eq: trade_acceptance_condition}. Recall the Newton method for a
-continuously differentiable function in $\mathbb{R}$ with an initial guess
-$x_0$ near a root $a$ the iteration
+\ref{eq: trade_acceptance_condition}. Recall the Newton method, for a
+continuously differentiable function $f$ with an initial guess
+$x_0$ in an adequate neighborhood of the root, with the iteration
 \begin{align}
     x_{n+1} = x_n - \frac{f(x_n)}{f'(x_n)},
 \end{align}
@@ -342,11 +344,12 @@ the iterations
 \begin{align}
     \delta_{k+1} = \delta_k - \frac{\varphi(y+\gamma\delta_k e_i
     -\tilde{\delta}e_j) -\varphi(y)}{\partial_{y_i}\varphi(y+\gamma\delta_k e_i
--\tilde{\delta}e_j)}\label{eq: iter_backward},\\
+-\tilde{\delta}e_j)},\\
 \tilde{\delta}_{k+1} = \tilde{\delta}_k + \frac{\varphi(y+\gamma\delta e_i
     -\tilde{\delta}_ke_j) -\varphi(y)}{\partial_{y_j}\varphi(y+\gamma\delta e_i
 -\tilde{\delta}_k e_j)}.
 \end{align}
+with optimal values at $\delta^{*}, \tilde{\delta}^{*}$ repsectively.
 To solve for $\tilde{\delta}^{*}$, fix $\delta$ and we can choose the
 iterates from the $\varepsilon$ ball defined by the Lipschitz continuity of
 the derivative. Assuming $\varphi$ is continuously differentiable, the
@@ -394,8 +397,8 @@ the $\varepsilon$ ball around the solution we have
     |\tilde{\delta} - \tilde{\delta}^{*} |^{2}dt
     +|f'(\tilde{\delta}) - f'(\tilde{\delta}^{*})|
     |\tilde{\delta}-\tilde{\delta}^{*} | \\
-    &\le \frac{1}{4c} |\tilde{\delta} - \tilde{\delta}^{*}| + \frac{1}{4c}
-    |\tilde{\delta} - \tilde{\delta}^{*}| = \frac{1}{2c} |\tilde{\delta} -
+    &\le \frac{1}{4c} |\tilde{\delta} - \tilde{\delta}^{*}| + \frac{1}{2c}
+    |\tilde{\delta} - \tilde{\delta}^{*}| = \frac{3}{4c} |\tilde{\delta} -
     \tilde{\delta}^{*}|.
 \end{align}
 For a $\tilde{\delta}_0 $ in the epsilon ball the first iterate is also in
@@ -407,43 +410,44 @@ the ball
     &\le |f'(\tilde{\delta}_0)|^{-1} |
     f(\tilde{\delta}_0) - f(\tilde{\delta}^{*}) -
     f'(\tilde{\delta}_0)(\tilde{\delta}_0 - \tilde{\delta}^{*})| \\
-    &\le \frac{1}{2} |\tilde{\delta}_0-\tilde{\delta}^{*} |
+    &\le \frac{3}{4} |\tilde{\delta}_0-\tilde{\delta}^{*} |
 \end{align}
 Repeating this argument $k\ge0$ times we get
 \begin{align}
-    |\tilde{\delta}_{k+1}-\tilde{\delta}^{*} | \le \left( \frac{1}{2} \right)^{k}
+    |\tilde{\delta}_{k+1}-\tilde{\delta}^{*} | \le \left( \frac{3}{4} \right)^{k}
     |\tilde{\delta}_0-\tilde{\delta}^{*}|
 \end{align}
 Thus the iterates of the Newton method $(\tilde{\delta}_k)_{k\in\mathbb{N}}$
 lie in the $\varepsilon$ ball of the solution, the iteration is well defined
 since the derivatives are non zero and the iterates converge to
-$\tilde{\delta}^{*}$ as $k\to\infty$. To solve for $\delta$, fix
+$\tilde{\delta}^{*}$ as $k\to\infty$. To solve for $\delta^{*} $, fix
 $\tilde{\delta}$, the proof stays the same.
 
 \section{General \& Optimal Trades on one CFMM}
-For general trades the agent chooses a trade $(x, \tilde{x})$ through the
-solution of an optimization problem that maximizes the change in the traders'
-portfolio $x -\tilde{x}$ through a utility function. The agent prefers
-a change in holdings that maximize a utility function $U: \mathbb{R}^{n}  \to
-\mathbb{R} \cup \{-\infty\} $. For two trades $(x, \tilde{x}$ and $(x',
+For general trades, the agent chooses a trade $(x, \tilde{x})$ through the
+solution of an optimization problem. The optimization problem maximizes the
+change in the traders' portfolio $x -\tilde{x}$ through a utility function.
+The agent prefers a change in holdings that maximize a utility function $U:
+\mathbb{R}^{n}  \to \mathbb{R} \cup \{-\infty\} $. For two trades $(x,
+\tilde{x}$ and $(x',
 \tilde{x}')$ the agent prefers the trade $(x, \tilde{x})$ if
 \begin{align}
     U(\tilde{x} -x) > U(\tilde{x}' - x').
 \end{align}
-And when $U \to -\infty$ the trade does not pass the trade acceptance
-condition or the change in the portfolio is absolutely not preferred. The
-utility function is chosen to be increasing and concave, and thereby
-differentiable. The trade that maximizes the utility can be framed as a
-constrained optimization problem, through the trade acceptance condition
+We map $U$ to  $\{-\infty\}$ when the trade does not pass the trade
+acceptance condition or the change in the portfolio is absolutely not
+preferred. We choose the utility function to be increasing, concave, and
+thereby differentiable. By the trade acceptance condition, the trade that
+maximizes the utility can be framed as a constrained optimization problem
 \begin{align}
     \text{max} \quad &U(\tilde{x} - x) \label{eq: gen_trade}\\
     \text{s.t.:}\quad & \varphi(y + \gamma x - \tilde{x}) =
     \varphi(y)\nonumber \\
       &x\ge 0 \qquad \tilde{x} \ge 0\nonumber
 \end{align}
-We would prefer the problem in equation \ref{eq: gen_trade} to be
-convex, then it can be solved efficiently fast using convex methods. The
-feasible set of the optimization problem is
+We would prefer the problem in equation \ref{eq: gen_trade} to be convex.
+Then it can be solved efficiently fast using convex methods. The feasible set
+of the optimization problem is
 \begin{align}
     D := \left\{ x \in \mathbb{R}^{n}_+,\; \tilde{x} \in \mathbb{R}^{n}_+\;
     |\;
@@ -460,8 +464,8 @@ reveals for $\left(\lambda x_1 + (1-\lambda)x_2, \lambda \tilde{x}_1
     \varphi\Big(y + \lambda(\gamma x_1 - \tilde{x}_1) + (1-\lambda)(\gamma
     x_2 - \tilde{x}_2)\Big) - \varphi(y),\label{eq: convexity_trade_condition}
 \end{align}
-cannot be reduced further, thus the convex combination does belong to $D$
-generally. But considering the relaxation from equality in $D$ to inequality
+cannot be reduced further, thus the convex combination generally does belong
+to $D$ . But, if we consider the relaxation from equality in $D$ to inequality
 $\ge$, i.e.
 \begin{align}
     D^{r} := \left\{ x \in \mathbb{R}^{n}_+,\; \tilde{x} \in \mathbb{R}^{n}_+\;
@@ -470,8 +474,7 @@ $\ge$, i.e.
 \right\},
 \end{align}
 together with the concavity of $\varphi$ and $y = \lambda y + (1-\lambda)y$,
-we can reduce the equation \ref{eq: convexity_trade_condition} further
-by
+we can reduce the equation \ref{eq: convexity_trade_condition} further.
 \begin{align}
     &\varphi\Big(y + \lambda(\gamma x_1 - \tilde{x}_1) + (1-\lambda)(\gamma
     x_2 - \tilde{x}_2)\Big) - \varphi(y) \\
@@ -489,8 +492,8 @@ For $(x_1, \tilde{x}_1), (x_2, \tilde{x}_2) \in D^{r}$ it holds that
     + (1-\lambda)\left(\varphi(y+\gamma x_2 - \tilde{x}_2) -
     \varphi(y)\right)\ge 0,
 \end{align}
-hence $D^{r}$ is convex. So the relaxation of problem \ref{eq: gen_trade},
-i.e.
+for all $\lambda \in [0, 1]$. Hence, $D^{r}$ is convex. So the relaxation of
+problem \ref{eq: gen_trade}, i.e.
 \begin{align}
     \text{max} \quad &U(\tilde{x} - x) \label{eq: convex_gen_trade}\\
     \text{s.t.:}\quad & \varphi(y + \gamma x - \tilde{x}) \ge
@@ -513,15 +516,18 @@ $\tilde{\varepsilon}>0$ until
     \varphi(y + \gamma (x-\varepsilon) - (\tilde{x}+\tilde{\varepsilon})) \ge \varphi(y).
 \end{align}
 But then the utility of $(x-\varepsilon, x+\tilde{\varepsilon})$ is bigger
-than that of $(x,\tilde{x})$. Hence, $(x,\tilde{x})$ is not an optimal
-solution. Furthermore the relaxed problem fulfills Slater CQ by choosing the
-choice of $\tilde{x}=0$ we can find a $x \in \mathbb{R}^{n}$ such that by the
+than that of $(x,\tilde{x})$. Thus, $(x,\tilde{x})$ is not an optimal
+solution.
+\newline
+
+Furthermore the relaxed problem fulfills Slater CQ. By the choice of
+$\tilde{x}=0$ we can choose any $x \in \mathbb{R}^{n}_+$ such that by the
 monotonicity assumptions on $\varphi$ we have
 \begin{align}
     \varphi(y +\gamma x) - \varphi(y) > \varphi(y + \gamma x - \tilde{x}) -
-    \varphi \ge 0.
+    \varphi(y) \ge 0.
 \end{align}
-Thus given a local minimum of the relaxed optimization problem we can find
+Thereby, given a local minimum of the relaxed optimization problem we can find
 Lagrange multipliers, forming a KKT-point satisfying the KKT conditions
 \ref{def: KKT}. And on the other hand if we find a KKT point we will have a
 local minimum.
@@ -535,8 +541,8 @@ equation \ref{eq: convex_gen_trade}, i.e.
 \end{align}
 Since Slater CQ is satisfied so is Abadie CQ, given some local minimum then
 there is a KKT point $(x , \tilde{x}, \lambda , \omega , \mu)$, which is a
-sufficient condition for optimality in the convex case. So $(x ,
-\tilde{x}$) is a local minimum of the optimization problem. Thereby any
+sufficient condition for optimality in the convex case with Slater CQ. Hence, $(x
+, \tilde{x}$) is a local minimum of the optimization problem and any
 $(x, \tilde{x}, \lambda, \omega, \mu)$ satisfying
 \begin{align}
     \begin{cases}
@@ -547,7 +553,7 @@ $(x, \tilde{x}, \lambda, \omega, \mu)$ satisfying
     \mu \ge 0,\; \mu \tilde{x} = 0\\
     \end{cases},
 \end{align}
-is a KKT point and then $x$ is a local minimum.
+is a KKT point.
 Here $L:
 \mathbb{R}^{n}\times\mathbb{R}_+\times\mathbb{R}_+^{n}\times\mathbb{R}_+^{n}
 \to \mathbb{R} $ is the Lagrangian, $\lambda \in \mathbb{R}_+, \omega \in
@@ -570,17 +576,18 @@ where $y' = y-\gamma x + \tilde{x}$. The two inequalities give
     \lambda \gamma \nabla \varphi(y') \le \nabla U(\tilde{x}-x)\le\lambda
     \nabla\varphi(y').
 \end{align}
-Specific interpretation for this condition is when the trade is not
-increasing the utility, e.g. for a solution $x = \tilde{x} = 0$. Then the
-condition, after dividing with $\lambda P_n$ becomes
+Specific interpretation for this condition comes when looking the trade that
+is not increasing the utility, e.g. for a solution $x = \tilde{x} = 0$. Then
+the condition, after dividing with $\lambda P_n$ becomes
 \begin{align}
     \gamma p \le \frac{1}{\lambda P_n}\nabla U(0) \le p.
 \end{align}
-The set of prices $p$ which satisfy this condition can is denoted by
+The set of prices $p$ which satisfy this condition is denoted by
 \begin{align}
-    K := \left\{p \in \mathbb{R}_+^{n}| \;\exists \alpha\ge0:\; \gamma p \le \alpha U(0) \le p \right\}
+    K := \left\{p \in \mathbb{R}_+^{n}| \;\exists \alpha\ge0:\; \gamma p \le
+    \alpha U(0) \le p \right\},
 \end{align}
-is in literature referred to as the no-trade cone for the utility U for trade
+in literature referred to as the no-trade cone for the utility U of trade
 function $\varphi$. The set is a cone since multiplying by any $p \in K$ by
 an $\eta > 0$, by division $\frac{\alpha}{\eta}$ is still bigger or equal to
 zero. The Set $K$ is also convex, for any $p_1, p_2 \in K$ and $\eta \in [0,
@@ -588,30 +595,30 @@ zero. The Set $K$ is also convex, for any $p_1, p_2 \in K$ and $\eta \in [0,
 $K$ a cone. The cone is nonempty since $0 \in K$ with the choice of $\alpha =
 0$.
 
-The case of linear utility $U(\psi) = z^{T} \psi$, with $z \in
-\mathbb{R}_+^{n}$, then
+In the case of linear utility $U(\psi) = z^{T} \psi$, with $z \in
+\mathbb{R}_+^{n}$ we have that
 \begin{align}
     \gamma p \le \frac{1}{\lambda P_n}z \le p,
 \end{align}
-component wise naturally.
+hods component wise.
 \section{Multi-DEX Trades}
-When trading trade with multiple DEXs, the agent will
-interacts with multiple CFMMs. In light of multi asset trades
-\ref{eq: convex_gen_trade} a generalization to an interaction with multiple CFMMS can
-be made. Consider assets $j \in \{1, \ldots,n\}$, labeled as such. Consider
-CFMMs $i \in \{1,\ldots,m\}$, each trading $N_i \subseteq \{1,\ldots,n\}  $
-assets which are specifically ordered based on the construction of the CFMM
-$i$ and trading function $\varphi_i: \mathbb{R}^{|N_i|}_+\to \mathbb{R}$ with
-liquidity $y_i$ and trading fee $\gamma_i$. To link the ordering of $N_i$ and
-asset labels $i$, consider binary matrices $A_i \in \mathbb{R}^{n\times
-|N_i|}$ with
+When trading with multiple DEXs, the agent interacts with multiple CFMMs. In
+light of multi asset trades \ref{eq: convex_gen_trade} a generalization to an
+interaction with multiple CFMMS can be made. Consider assets $j \in \{1,
+\ldots,n\}$, labeled as such. Consider CFMMs $i \in \{1,\ldots,m\}$, each
+trading $N_i \subseteq \{1,\ldots,n\}  $ assets which are specifically
+ordered based on the construction of the CFMM $i$ and trading function
+$\varphi_i: \mathbb{R}^{|N_i|}_+\to \mathbb{R}$ with liquidity $y_i$ and
+trading fee $\gamma_i$. To link the ordering of $N_i$ and asset labels $i$,
+consider the binary matrix $A_i \in \mathbb{R}^{n\times |N_i|}$ with
 \begin{align}
     (A_i)_{kj} =
     \begin{cases}
         1 & \text{for } k \in N_i, \; k = j \\
-        0 & \text{else}.
+        0 & \text{else},
         \end{cases}
 \end{align}
+for all $i \in \{1,\ldots,m\} $.
 The agent interacts with each CFMM $i$ through a trade $(x_i, \tilde{x}_i)$, the
 mapping to the asset indices $j$ is done through the matrices $A_i$. Hence,
 the global trade vector interacting with all CFMMs is $\psi \in
@@ -619,10 +626,10 @@ the global trade vector interacting with all CFMMs is $\psi \in
 \begin{align}
     \psi = \sum_{i=1}^{m} A_i(\tilde{x}_i-x_i).
 \end{align}
-The implication if $\psi_k > 0$, means that the agent does not give any
-amount of asset $k$ to the set of CFMMs. From this the agent still might
-trade asset $k$, but receives as much as given. Analogous to multi-asset
-trades, the agent judges a trade with a utility function
+The implication of $\psi_k \ge 0$, means that the agent does not give any
+amount of asset $k$ at the end of the trade to the set of CFMMs. The agent
+still might trade asset $k$, but receives a positive amount. Analogous to
+multi-asset trades, the agent judges a trade with a utility function
 \begin{align}
     U:\mathbb{R}^{n}&\to\mathbb{R}\\
     \psi &\mapsto U(\psi),
@@ -633,10 +640,11 @@ the agent wants to increase the holdings $h\in \mathbb{R}_+^{n}$ after the
 trade, then $U(\psi) = \psi + h \ge 0$ is a constraint satisfying the
 condition of increasing the holdings. For any trade which does not satisfy
 the constraint, the utility is $-\infty$, hence not acceptable.
+\newline
 
-A set of optimal trades with CFMMs maximizing the utility is
+A set of optimal trades with multiple CFMMs, maximizing the utility is
 \begin{align}
-    \text{max} \quad &U\left(\sum_{i=1}^{m} A_i(\tilde{x}_i-x_i)\right) \label{eq: multi_dex_trade_orig}\\
+    \text{max} \quad &U\left(\sum_{i=1}^{m} A_i(\tilde{x}_i-x_i)\right)\\
     \text{s.t.:}\quad
                       & (x_i, \tilde{x}_i) \in D_i \;\; \forall i \in
                       \{1,\ldots,m\},
@@ -666,7 +674,7 @@ D_i^{r}  = \left\{(x, \tilde{x})|\; x, \tilde{x} \in \mathbb{R}^{|N_i|}_+, \;\;
 Similar to the argumentation in section \ref{sec: optimality condition} the
 Slater CQ is satisfied for all CFMM $\varphi_i$ $i \in \{1,\ldots,m\}$ by
 setting $\tilde{x}_i = 0$. Since the problem is convex and Slater CQ is
-satisfied the KKT conditions are necessary and sufficient for optimality, the
+satisfied the KKT conditions are necessary and sufficient for optimality. The
 Lagrangian of the problem is
 \begin{align}
     L(x, \tilde{x}, \nu, \lambda, \omega, \mu) = -U(x, \tilde{x}) +
@@ -676,9 +684,9 @@ Lagrangian of the problem is
 The KKT conditions give
 \begin{align}
     &0 = \nabla L = -\nabla U(x, \tilde{x}) + \nu = 0 \\
-    \implies& \nabla U(x, \tilde{x}) = \nu.
+    \Rightarrow& \nabla U(x, \tilde{x}) = \nu.
 \end{align}
-Also for all $i \in \{1,\ldots,m\}$
+Also for all $i \in \{1,\ldots,m\}$ we have
 \begin{align}
     &\nabla_{x_i} L = A_i^{T}\nabla U(x, \tilde{x}) - \lambda_i\gamma\nabla\varphi_i(y_i
     +\gamma_ix_i -\tilde{x}_i) - \underbrace{\omega}_{\ge0}\\
@@ -738,8 +746,8 @@ trade needs to maximize the utility of the trade minus the transaction cost
           &\eta_i \in \{0, 1\},
 \end{align}
 with variables $x_i, \tilde{x}_i$, $i\in\{1,\ldots,m\}$ and $\eta \in
-\{0,1\}^{m} $. What we have here is a mixed integer convex optimization
-problem. A possible solution might evolve the relaxation to the condition
+\{0,1\}^{m} $. This is a mixed integer convex optimization
+problem. A possible solution might evolve the relaxation of the condition
 $\eta \in [0, 1]^{m}$ to transform it to a convex optimization problem. And
 introduce a learned parameter $\tau(\theta)$ with some weights $\theta$, as a
 threshold to flip the value of $\eta$ to one or zero. This however would
@@ -748,24 +756,27 @@ real world scenarios. The trade-off would be to have a faster solution when
 computing in real time.
 \section{Cyclic Arbitrage}
 Let us go back to the general trading problem without transaction fees in
-equation \ref{eq: multi_dex_trade}. It is important to note here that the
+equation \ref{eq: multi_dex_trade}. It is important to note, that the
 solution does specify in which order the trades should be executed and that
-the computational effort will grow larger with more CFMM. Hence, in a large
-space of CFMM it is a separate problem of finding cyclic arbitrage path. This
-path will give the order of the trades and specify for which CFMM the
+the computational effort will grow larger with more CFMMs. Hence, in a large
+space of CFMMs it is a separate problem of finding cyclic arbitrage walks. This
+walk will give the order of the trades and specify for which CFMM the
 optimization problem needs to be framed, dropping the rest.
+\newline
 
 We consider now that the agent has found a cyclic arbitrage path of $m \in
-\mathbb{N} $ CFMM. For an arbitrage trade the agent needs the trade to be
-valid, i.e. $\sum_{i=1}^{m} A_i(\tilde{x}_i-x_i) \neq 0$. The agent also needs to have $\sum_{i=1}^{m} A_i(\tilde{x}_i-x_i) \ge 0$, since
-at the end of a set of trades, the arbitrage trade receives a positive amount
-of at least one asset. This hold only for $\sum_{i=1}^{m} A_i(\tilde{x}_i-x_i)$, i.e. at the end of the
-trade. The utility function needs to be bound in the domain
-$\mathbb{R}_+^{n}$, and there is an arbitrage if there is a nonzero solution.
-An optimal arbitrage is one that maximizes the utility under the constraints
-i.e. $U\left(\sum_{i=1}^{m} A_i(\tilde{x}^{*} _i-x^{*} _i)\right) > U(0)$
-with $x^{*}, \tilde{x}^{*} $ the optimal solution. As discussed we have the
-follwing optimization problem for the general multiasset optimal trade
+\mathbb{N} $ CFMMs. For an arbitrage trade, the agent needs the trade to be
+valid, i.e. $\sum_{i=1}^{m} A_i(\tilde{x}_i-x_i) \neq 0$. The agent also
+needs $\sum_{i=1}^{m} A_i(\tilde{x}_i-x_i) \ge 0$, because at the end
+of a set of trades, the arbitrage trade receives a positive amount of at
+least one asset. This hold only for $\sum_{i=1}^{m} A_i(\tilde{x}_i-x_i)$,
+i.e. at the end of the trade. The utility function needs to be bound in the
+domain $\mathbb{R}_+^{n}$. There is an arbitrage, if there is a nonzero
+solution. An optimal arbitrage is one that maximizes the utility under the
+constraints i.e. $U\left(\sum_{i=1}^{m} A_i(\tilde{x}^{*} _i-x^{*} _i)\right)
+> U(0)$ with $x^{*}, \tilde{x}^{*} $ the optimal solution. As discussed we
+have the follwing optimization problem for the general multiasset optimal
+trade
 \begin{align}
     \text{max} \quad &U\left(\sum_{i=1}^{m} A_i(\tilde{x}_i-x_i)\right) \label{eq: arb_trade}\\
     \text{s.t.:}\quad & (x_i, \tilde{x}_i) \in D_i^{r}
@@ -850,8 +861,8 @@ This can be rewritten into a quadratic form by simplifying
 Set $\xi_i = \begin{pmatrix} \delta_i & \tilde{\delta}_i\end{pmatrix} ^{T}
 \in \mathbb{R}^{2}$, $c_i = \begin{pmatrix} -\gamma_iy_{i,2}&
     y_{i,1}\end{pmatrix}^{T} \in \mathbb{R}^{2}$ and $B = \begin{pmatrix} 0 &
-1\\ 0 & 0\end{pmatrix}$. Then the constraint can be written quadratic
-constraint
+1\\ 0 & 0\end{pmatrix}$. Then the constraint can be written into quadratic
+form
 \begin{align}
     c\xi_i + \left(\sum_{i=j}^{m} A_j(\tilde{x}_j-x_j)\right)_i^{T} A\xi_i \le 0.
 \end{align}
@@ -865,16 +876,16 @@ optimization problem becomes a quadratically constrained linear problem.
           c_i^{T} \xi_i + \gamma_i \xi_i^{T} B\xi_i \le 0
           \;\; \forall i \in \{1,\ldots,n\}.
 \end{align}
-Additionally, it is possible use matrix factorization to factor $\sum_{i=1}^{n}A_iR\xi_i$
-into $A\xi$ for $A \in \mathbb{R}^{n\times2n}$ with entries $-1, 0,
-1$, with $\xi = \begin{pmatrix} \delta_1 & \tilde{\delta}_1 & \hdots &
-\delta_n & \tilde{\delta}_n \end{pmatrix}^{T}  \in \mathbb{R}^{2n}  $. Also,
-it is possible to pull the inequality constraint into a single constraints
-under the same $\xi$ with a $c \in \mathbb{R}^{2n}$ and $D \in \mathbb{R}^{2n
-\times 2n}$ consisting of $n$ blocks of $\gamma_iB$, to get
+Additionally, it is possible use matrix factorization to factor
+$\sum_{i=1}^{n}A_iR\xi_i$ into $A\xi$ for $A \in \mathbb{R}^{n\times2n}$ with
+entries $-1, 0, 1$, together with $\xi = \begin{pmatrix} \delta_1 &
+\tilde{\delta}_1 & \hdots & \delta_n & \tilde{\delta}_n \end{pmatrix}^{T} \in
+\mathbb{R}^{2n}  $. We can also pull the inequality constraint into a single
+constraints under the same $\xi$ with a $c \in \mathbb{R}^{2n}$ and $D \in
+\mathbb{R}^{2n \times 2n}$ consisting of $n$ blocks of $\gamma_iB$, to get
 \begin{align}
     \text{max} \quad & 1^{T}A\xi \label{eq: quadratically_constrained_general}\\
     \text{s.t.:}\quad & c\odot \xi + \xi \odot D\xi \le 0\\
           & \xi \ge 0,
 \end{align}
-where $\odot$ denotes the componentwise multiplication
+where $\odot$ denotes the componentwise multiplication.

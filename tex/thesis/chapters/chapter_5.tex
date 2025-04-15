@@ -2,26 +2,25 @@
 In chapter we go through the RL framework \& neural network model used
 to find profitable walks in the CFMM arbitrage problem and present results.
 Firstly we introduce the model for the underlying MDP, states, actions and
-rewards. The policy is parametrized  via the deep GNNs of the line graph of
-the problem and the training setup uses the setup from chapter \ref{sec:
-gen}.
+rewards. The policy is parametrized via a deep GNN of the line graph of
+the problem and the training uses the setup from chapter
+\ref{sec: gen}.
 
 \section{Agent and Environment}
-The framework the agent is learning to find a walk in a graph that does not
-use repeated edges (trail), starts and ends at the same node, i.e. is
-circular, and is profitable. The graph is represented by ERC20 \cite{erc20}
-tokens (referred to as assets) as nodes and decentralized exchange pools,
-CFMM with two assets, as edges (referred to as pools). Each pool has a swap
-fee, which usually is in the range of $0.3\%-1\%$, and a marginal exchange
-rate. The marginal exchange rate, unique to the pool, is inversely
-bidirectional. Meaning, while swapping token $0$ for token $1$ in the pool
-the usual marginal exchange rate is used, but when swapping from token $1$ to
-token $0$ the inverse marginal exchange rate is used. In both cases the
-referred term is marginal exchange rate. `Used' here is meant in the context
-of the learning setup, in the actual setting the automated market maker
-formula is used to determine the amount exchanged \ref{chap: cfmms}.
-Throughout we will use the term `pool' and edge, `asset' and node
-interchangeably.
+The goal is to find a walk in a graph that does not use repeated edges
+(trail), starts and ends at the same node, i.e. is circular, and is
+profitable. The graph is represented by ERC20 \cite{erc20} tokens (referred
+to as assets) as nodes and decentralized exchange pools, CFMM with two
+assets, as edges (referred to as pools). Each pool has a swap fee, which
+usually is in the range of $0.3\%-1\%$, and a marginal exchange rate. The
+marginal exchange rate, unique to the pool, is inversely bidirectional.
+Meaning, while swapping token $0$ for token $1$ in the pool the usual
+marginal exchange rate is used, but when swapping from token $1$ to token $0$
+the inverse marginal exchange rate is used. In both cases the referred term
+is marginal exchange rate. `Used' here is meant in the context of the
+learning setup, in the actual setting the automated market maker formula is
+used to determine the amount exchanged \ref{chap: cfmms}. Throughout we will
+use the term `pool' and edge, `asset' and node interchangeably.
 \newline
 
 The agent starts from a given node (asset) and chooses actions from a set of
@@ -34,13 +33,12 @@ the pools' exchange rate will be in balance with the overall market. Hence, the
 pool has no liquidity for an arbitrage to be used again.
 \newline
 
-When the agent arrives at a terminal state, there are two possibilities. The
-first possibility is when the agent has arrived back to the starting point,
-then the product of the exchange rates is calculated to give the profit of
-the walk. In this case, at each trade a trading penalty can utilized to
-account for the fees of each transaction. The second possibility is when the
-agent arrives at a dead end, meaning the agent has not reached the starting
-point and has no valid actions left.
+We terminate the process of trades, when the agent has arrived back to the
+starting point, then the product of the exchange rates is calculated to give
+the profit of the walk. In this case, at each trade a trading penalty can
+utilized to account for the fees of each transaction. We also terminate the
+process of trades, when the agent arrives at a dead end, meaning the agent
+has not reached the starting point and has no valid actions left.
 \newline
 
 To bring it all together the MDP is based on a multi bidirectional graph $G =
@@ -52,8 +50,8 @@ it has the weight
 w_{ij}^{k} =\frac{p_i^{k} }{p_j^{k} },
 \end{align}
 where $p_i^{k} $ and $p_j^{k} $ are the marginal exchange rates of the assets
-$i$ and $j$ in pool $k$ respectively as defined in equation \ref{eq:
-marginal_rate}. The edge $e_{ji}^{k}$ has the weight
+$i$ and $j$ in pool $k$ respectively as defined in equation
+\ref{eq: marginal_rate}. The edge $e_{ji}^{k}$ has the weight
 \begin{align}
 w_{ji}^{k}  = \frac{1}{w_{ij}^{k} } = \frac{p_j^{k}}{p_i^{k}}.
 \end{align}
@@ -78,8 +76,8 @@ $\mathbb{P}[s'|s, a] = 1$ is the probability of landing in state $s'$ by
 taking action $a$ at state $s$. The MDP is deterministic.\newline
 \textbf{Rewards}. The reward probabilities $R$, since the MDP is
 deterministic the reward function at state $s_t$ is $r(s_t)$. Throughout the
-MDP, the agent is rewarded $r(s_t) =0$, except when landing back at the
-origin node. All together the agent is rewarded by
+MDP, the agent is rewarded $r(s_t) =0$, except when at a terminal state. All
+together the agent is rewarded by
 \begin{align}
     r(s_t) =
     \begin{cases}
@@ -156,7 +154,7 @@ compressed down to an output dimension of $2$ per node through a linear
 connection with Relu activation function
 \begin{align}
     \pi_\theta(s) = \text{softmax}\left(   W_p \cdot
-    \text{relu}\left(\text{BN}_p(\text{GAT}_p(h^{(c)}_1,\ldots,h^{(c)}_n))\right)\right),
+    \text{ReLU}\left(\text{BN}_p(\text{GAT}_p(h^{(c)}_1,\ldots,h^{(c)}_n))\right)\right),
 \end{align}
 where $W_p \in \mathbb{R}^{2\times d_h}$ is the learned linear connection,
 and the index $p$ denotes the distinct weights used for the policy head. To
@@ -171,35 +169,34 @@ the Ethereum blockchain. The next state is chosen based on $N_{\text{MCTS}}$
 searches with selection probabilities computed through $\pi_\theta$. In each
 iteration the agent plays the network $N_{\text{play}}$ times until reaching
 a terminal state. Upon reaching a terminal state: the state, the action, the
-reward and the policy vector of the MCTS algorithm are saved. After the self
+reward and the policy vector of the MCTS result are saved. After the self
 play stage the model parameters are updated based on the self play data. We
-alter the Rollout-Simulation parse of the MCTS algorithm by instead of doing
-one random rollout we do $N_{\text{sim}}$ number of rollouts. We fully
-utilize the REINFORCE algorithm updates through \ref{alg: reinforce}, where
-the loss function can be written as
+fully utilize the REINFORCE algorithm updates through \ref{alg: reinforce},
+where the loss function can be written as
 \begin{align}
     L(\theta) = -\frac{1}{N_{\text{batch}}}
     \sum_{i=1}^{N_{\text{batch}}}\left( G_{i}-B(b_i, s^{b_i}_{i_{t}}) \right)y_i
-    \ln \pi_{\theta} (s^{b_i}_{i_t}),
+    \ln \pi_{\theta} (s^{b_i}_{i_t}).
 \end{align}
-where $G_i$ is the sum of the rewards as in the REINFORCE algorithm, and
-$y_i$ a one hot vector with $1$ at the index of the action taken at the end
-of an MCTS. We utilize a baseline function $B(b_i)$ dependent on the block
-$b_i$. During the training we gather the rewards of each block, we then
-compute the average and multiply it by the discount factor $\gamma$ with
-exponent dependant on the state $s^{b_i}_{i_t}$ as per $G_i$. E.g. the first
-state of an episode the exponent would be $T$ and at the last one $1$.
+Values of $G_i$ are the sum of the rewards as in the REINFORCE algorithm, and
+$y_i$ a one hot vector with $1$ at the index of the action taken sampled from
+the MCTS improved policy. We utilize a baseline function $B(b_i)$ dependent
+on the block $b_i$. During the training we gather the rewards of each block,
+we then compute the average and multiply it by the discount factor $\gamma$
+with exponent dependant on the state $s^{b_i}_{i_t}$ as per $G_i$. E.g. the
+first state of an episode the exponent would be $T$ and at the last one $1$.
 \newline
-The action taken at the end of an MCTS is determined by the MCTS improved policy
-$\pi^{\text{MCTS}}$. The $Q$ values are estimated through the MCTS and
-parametrized policy $\pi_\theta$ search. The full reinforcement learning
-algorithm algorithm in pseudo-code is the following
+We use the MCTS version described in \ref{sec: gen}. The action taken at the end
+of an MCTS is determined by the MCTS improved policy $\pi^{\text{MCTS}}$
+based on \ref{eq: mcts_improved}. Instead of doing one rollout per state we
+initiate $N_{\text{sim}}$ number of rollouts. The full algoritum utilizing
+MCTS with REINFORCE is the following in pseudocode \ref{alg: rl_alg}.
 \begin{algorithm}[H]
 \caption{RL Algorithm}\label{alg: rl_alg}
     \begin{algorithmic}
         \While{within computational budget}
-        \For {$i=1,\ldots, N_{\text{play}}$}
-            \For {$i=1,\ldots, N_{\text{batch}}$}
+        \For {$1,\ldots, N_{\text{Epoch}}$}
+            \For {$i=1,\ldots, N_{\text{play}}$}
                 \State Initialize state $s = s_0$ at block $b \sim \text{Uniform}(B)$
                 \While{not terminal}
                 \State $\pi^{MCTS}(s)  \gets \text{MCTS}(s)$
@@ -222,7 +219,7 @@ $\varepsilon = 10^{-8}$ to prevent division by zero. We set the discount rate
 constant $\gamma = 0.98$ from REINFORCE \ref{alg: reinforce}. We use
 $N_{\text{batch} } = 25$, $N_{\text{play}} = 200$, $N_{\text{MCTS}} = 100$
 with $N_{\text{sim}}=100$ (rollout simulations for value estimation) with
-$100$ iterations. The marginal exchange rates are pulled from the block range
+$N_{\text{Epoch}}=100$ iterations. The marginal exchange rates are pulled from the block range
 $t \in [18\cdot10^{6}, 21.8\cdot10^6]$. The number of residual block layers
 is $N=4$, these do not share weights. The UCB exploration-exploitation
 parameter $C$ in the MCTS algorithm for choosing the next child in the tree
@@ -250,7 +247,8 @@ $12$ hours ($\sim12s$ is the time until the next block). During each
 self-play, a random block is sampled from which the marginal exchange rates
 are taken. Each state starts with the agent holding the WETH asset, from
 which the agent chooses a pool to conduct a swap with WETH to another token
-until reaching a terminal state.
+until reaching a terminal state. The code for the data extraction can be
+found at \cite[Github]{github}.
 \section{Results}
 Firstly we will look at the pure REINFORCE method on one block. We just apply
 the Algorithm from \ref{alg: reinforce} on the MDP. Instead of updating each

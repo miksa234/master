@@ -1,11 +1,12 @@
 \chapter{Background on Nonlinear Optimization}
 In this chapter we will go through the necessary background to understand
 optimality conditions for nonlinear constrained optimization problems. We
-will introduce necessary optimality conditions. In the case we have a \"nice
-enough\", convex, set we can show that these condition become sufficient for
-optimality. These are all very well known results from the theory of
-nonlinear optimization, hence this chapter is heavily based on the lecture
-notes \cite{bot_optimization}.
+will introduce necessary optimality conditions. In the case we have a 'nice
+enough', convex set we can show that under certain qualifications the
+neccessary conditions are also sufficient for optimality. These are all very
+well known results from the theory of nonlinear optimization, hence this
+chapter is based on the lecture notes in
+\cite{bot_optimization}.
 \section{First Order Optimality Conditions}
 Generally we are considering a nonempty subset $X \subseteq \mathbb{R}^{n}$
 for $n \in \mathbb{N}$ and a function $f: \mathbb{R}^{n}  \to \mathbb{R}$ in
@@ -28,9 +29,9 @@ on the whole set $X$.
 \begin{align}
     f(x^{*}) \le f(x) \qquad \forall x \in X.
 \end{align}
-To better understand local minima we can introduce look at directions, from a
-given point $x_0$, from where we can move and still remain in $X$. In this
-sense we introduce a cone
+To better understand local minima we look at directions, from a given point
+$x_0$, from where we can move and still remain in $X$. In this sense we
+introduce a cone
 \begin{align}
     T_X(x_0) := \left\{ d \in \mathbb{R}^{n}\Big|\;\exists (x^k)_{k \in
     \mathbb{N}} \subseteq X,\; \exists (t_k)_{k \in \mathbb{N} }\searrow
@@ -87,14 +88,15 @@ thereby
               &\ge 0.
 \end{align}
 \end{proof}
-Basically statement in Proposition \ref{prop: descent} says that at a local
-minimum $x^{*}$ there is no tangent direction or `descent direction' for
-which $\phi '(0) < 0$, where $\phi(t) := f(x^{*} + t d)$.
+The statement in Proposition \ref{prop: descent}, basically implies that at a
+local minimum $x^{*}$ there is no tangent direction or `descent direction'
+for which $\phi '(0) < 0$, where $\phi(t) := f(x^{*} + t d)$.
 
-Bringing everything together give the first order optimality condition.
+Bringing everything together gives the first order optimality condition for
+unconstrained problems.
 \begin{theorem}
     Let $x^{*}$ be a local minimum of \ref{eq: basic_opt} and $f \in C^{1}
-    (U_\varepsilon(x^{*} )$ for an $\varepsilon >0$. Then $x^{*}$ is a
+    (U_\varepsilon(x^{*} ))$ for an $\varepsilon >0$. Then $x^{*}$ is a
     critical point of $f$, i.e.
     \begin{align}
         \nabla f(x^{*}) = 0.
@@ -117,7 +119,7 @@ constrained optimization problem through
             h_j(x) = 0,\; j=1,\ldots,p
     \end{array} \right\}.
 \end{align}
-Then we have a general optimization problem
+Then we have a general constrained nonlinear optimization problem
 \begin{align}
     \min\;&f(x) \label{eq: gen_constraned}\\
     \text{s.t.:}\;&g_i(x) \le 0,\; i=1,\ldots,m \nonumber\\
@@ -127,19 +129,20 @@ Then we have a general optimization problem
 i.e. $x \in X$, in the feasible set.
 
 Generally the Bouligard tangent cone $T_X(x_0)$ for a $x_0 \in X$ is not a
-practical object, since it cannot be determined out of the box. Hence we can
+practical object, since it cannot be determined out of the box. Hence, we
 introduce the linearized tangent cone, which will serve as a replacement and
-can be easily determined for a given feasible set $X$ and in a specific
-setting will be valid representation of the Bouligard tangent cone. For an
-element $x_0 \in X$ consider
+can be easily determined for a given feasible set $X$. Also, in a specific
+setting the linearized tangent cone will be valid representation of the
+Bouligard tangent cone. For an element $x_0 \in X$ consider
 \begin{align}
     \mathcal{A}(x_0) = \left\{ i = 1,\ldots,m|\;g(x_0) = 0 \right\},
 \end{align}
 the set of active indices at $x_0$ and
 \begin{align}
-    \mathcal{I}(x_0) = \left\{1,\ldots,m \right\}\setminus\mathcal{A}(x_0).
+    \mathcal{I}(x_0) = \left\{1,\ldots,m \right\}\setminus\mathcal{A}(x_0),
 \end{align}
-Then the linearized tangent cone of $X$ at $x_0$ is defined as
+the set of inactive indices at $x_0$. The linearized tangent cone of $X$ at
+$x_0$ is defined as
 \begin{align}
     T_{\text{lin} }(x_0) = \left\{
         d\in \mathbb{R}^{n} \Big|
@@ -156,19 +159,19 @@ $\lambda>0$ does not change the outcome of the equalities and inequalities.
 \end{lemma}
 \begin{proof}
     We start with a $x_0 \in X$ and $d \in T_X(x_0)$. Then there are
-    sequences from the Bouligard tangent cone $(x^{k})_{k\in N}$ and
+    sequences by the definition of the Bouligard tangent cone, $(x^{k})_{k\in N}$ and
     $(t_k)_{k \in N} \searrow 0 $, such that
     \begin{align}
-        \lim_{ k \to \infty} \frac{x^k-x_0}{t_k} = 0.
+        \lim_{ k \to \infty} \frac{x^k-x_0}{t_k} = d.
     \end{align}
-    First we prove that $\nabla g_i(x_0)^{T} d \le 0$ for all active indices
-    $i \in \mathcal{A}(x_0)$. For this consider the mean value theorem, for
+    First we prove that $\nabla g_i(x_0)^{T} d \le 0$, for all active indices
+    $i \in \mathcal{A}(x_0)$. For this we use the mean value theorem, for
     all $k\ge1$ there is a $\xi^{k}  \in \{\lambda x_0 + (1-\lambda) x^{k}|\;
     \lambda \in [0, 1]\} $ such that
     \begin{align}
         g_i(x^{k}) - g_i(x_0) = \nabla g_i(\xi^{k})^{T} (x^{k} - x_0).
     \end{align}
-    Since $i$ is active then we have $g_i(x_0) = 0$ and thus
+    Since $i$ is active, we have $g_i(x_0) = 0$ and thus
     \begin{align}
          \nabla g_i(\xi^{k})^{T} (x^{k} - x_0) = g_i(x^{k}) \le 0.
     \end{align}
@@ -207,28 +210,28 @@ $\lambda>0$ does not change the outcome of the equalities and inequalities.
             that $b^{T} d  \ge 0$.
     \end{enumerate}
 \end{lemma}
-\begin{proof}
-    We can use the strong duality result to prove equivalence.
-    For (1) $\Rightarrow$ (2), consider
-    \begin{align}
-        \text{min}\; & 0^{T} x\\
-        \text{s.t.:}\;& Ax = b \nonumber \\
-            & x \ge 0. \nonumber
-    \end{align}
-    Thus the dual of wrt. $d \in \mathbb{R}^{m}$ is
-    \begin{align}
-        \text{max}\; & b^{T}d \\
-        \text{s.t.:}\;& Ad \ge 0 \nonumber
-    \end{align}
-    By strong duality the optimal value of the dual is $0 \in
-    \mathbb{R}^{m}$. Hence, for all $d$ with $A^{T}d \ge 0$ we have that
-    $b^{T}d \ge 0$.
-
-    For (2) $\Rightarrow$ (1), we have that $b^{T} d \ge 0$ for all $d$ with
-    $A^{T} d \ge 0$. By strong duality the optimal value of the primal is
-    $0$, and by the dual the optimal solution needs to be $x\ge 0$. By
-    feasibility of the primal there is an $x\ge0$ satisfying $Ax=b$.
-\end{proof}
+%\begin{proof}
+%    We can use the strong duality result to prove equivalence.
+%    For (1) $\Rightarrow$ (2), consider
+%    \begin{align}
+%        \text{min}\; & 0^{T} x\\
+%        \text{s.t.:}\;& Ax = b \nonumber \\
+%            & x \ge 0. \nonumber
+%    \end{align}
+%    Thus the dual of wrt. $d \in \mathbb{R}^{m}$ is
+%    \begin{align}
+%        \text{max}\; & b^{T}d \\
+%        \text{s.t.:}\;& Ad \ge 0 \nonumber
+%    \end{align}
+%    By strong duality, the optimal value of the dual is $0 \in
+%    \mathbb{R}^{m}$. Hence, for all $d$ with $A^{T}d \ge 0$ we have that
+%    $b^{T}d \ge 0$.
+%
+%    For (2) $\Rightarrow$ (1), we have that $b^{T} d \ge 0$ for all $d$ with
+%    $A^{T} d \ge 0$. By strong duality the optimal value of the primal is
+%    $0$, and by the dual the optimal solution needs to be $x\ge 0$. By
+%    feasibility of the primal there is an $x\ge0$ satisfying $Ax=b$.
+%\end{proof}
 \begin{theorem}
     \label{thm: duality}
     Let $x_0 \in X$, the it holds that
@@ -258,13 +261,14 @@ $\lambda>0$ does not change the outcome of the equalities and inequalities.
         -\sum_{j=1}^{p} \mu_j \nabla h_j(x_0)^{T} d\\
                  &\ge 0.
     \end{align}
-    Because $\lambda_i \ge0$, $\nabla g_i(x_0)^T d \le 0$ and $\nabla
+    by $\lambda_i \ge0$, $\nabla g_i(x_0)^T d \le 0$ and $\nabla
     h_j(x_0)^{T} d =0 $. Hence $s \in -(T_{\text{lin} }(x_0))^{*}$.
 
     Direction $\subseteq$: Let $s \in -(T_{\text{lin} }(x_0))^{*}$, then by
     definition $-s^{T} d \ge 0$ for all $d \in T_{\text{lin}}(x_0)$. We can
     use Lemma \ref{lem: ferkas} with the matrix $A \in \mathbb{R}^{n\times
-    (r + 2p)}$ with $\mathcal{A}(x_0) = \{i_1, \ldots, i_r\} $ and
+    (r + 2p)}$, with active indices $\mathcal{A}(x_0) = \{i_1, \ldots, i_r\}
+    $ defined as
     \begin{align}
         A:=\begin{pmatrix} A_g, A_h, -A_h
         \end{pmatrix},
@@ -284,9 +288,9 @@ $\lambda>0$ does not change the outcome of the equalities and inequalities.
     \mathbb{R}_+^{r}\times \mathbb{R}^{p}_+\times \mathbb{R}_+^{p}$
     satisfying
     \begin{align}
-        A\nu = -s,
+        A\nu = -s.
     \end{align}
-    which is equivalent to
+    This is equivalent to
     \begin{align}
         \sum_{i=1}^{m} -\lambda_i\nabla g_i(x_0)
         +\sum_{j=1}^{p} (\mu_1)_j\nabla h_j(x_0)
@@ -310,7 +314,7 @@ Next we will introduce the KKT conditions
     \begin{align}
         L(x, \lambda, \mu)= f(x) + \lambda^{T} g(x) + \mu^{T} h(x)
     \end{align}
-    is called the Lagrangian function of the optimization problems
+    is called the Lagrangian function of the optimization problem
     \ref{eq: gen_constraned}. The conditions
     \begin{align}
         \begin{cases}
@@ -330,22 +334,23 @@ Next we will introduce the KKT conditions
     called Lagrange multipliers associated with the corresponding restrictions,
     i.e. $g(x^{*}) \le 0$ and $h(x^{*}) = 0$.
 \end{definition}
-In the case there are no restrictions the KKT optimality conditions are
-$\nabla f(x) = 0$. Thus the interpretation of these conditions is a
-generalization of the first order optimality for constrained optimization and
-these play are necessary conditions for a solution to be optimal. The KKT
-conditions are sufficient for a local optimum, however in the case the
-problem is convex the conditions are sufficient.
+In the case there are no restrictions, the KKT optimality conditions are
+$\nabla f(x) = 0$. Thus the scope of these conditions is a generalization of
+the first order optimality for constrained optimization and these play are
+necessary conditions for a solution to be optimal. The KKT conditions
+together with Abadie constraint qualification are necessary for a optimality.
+However, in the case the problem is convex together with Slater constraint
+qualification the KKT-conditions are also sufficient.
 \begin{definition}
-    Let $x_0 \in X$, where $X$ is the feasible set from equation \ref{eq:
-    gen_constraned}. Then $x_0$ fulfills Abadie constraint qualification (CQ)
-    if
+    Let $x_0 \in X$, where $X$ is the feasible set from equation
+    \ref{eq: gen_constraned}. Then $x_0$ fulfills Abadie constraint
+    qualification (CQ) if
     \begin{align}
         T_X(x_0) = T_{\text{lin}}(x_0).
     \end{align}
 \end{definition}
-A particularly nice thing about this CQ is that it does not assume anything
-about the objective function $f$ and gives a very nice result.
+A particularly nice thing about Abadie CQ is that it does not assume anything
+about the objective function $f$ and a very nice result can be proven.
 \begin{theorem}
     Let $x^{*}$ be local minimum of \ref{eq: gen_constraned}, fulfilling
     Abadie CQ. Then there exist Lagrange multipliers $\lambda^{*} \in
@@ -369,24 +374,24 @@ about the objective function $f$ and gives a very nice result.
    \mathcal{I}(x^{*})$ and $\mu^{*}_j \in \mathbb{R}$ for all $j=1,\ldots,p$.
    Then we expand the sum and rearrange to get
    \begin{align}
-       &\nabla f(x^{*}) + \sum_{i=1}^{m} \lambda^{*}_m\nabla g(x^{*}
+       &\nabla f(x^{*}) + \sum_{i=1}^{m} \lambda^{*}_m\nabla g(x^{*})
     + \sum_{j=1}^{p} \mu^{*}_j \nabla h_j(x^{*}) = 0
    \end{align}
    which is the first condition in the KKT conditions
    \begin{align}
        \nabla_x L(x^{*}, \lambda^{*}, \mu^{*}) = 0.
    \end{align}
-   Also we have that if $i$ is active $g_i(x^{*}) = 0$ and if $i$ is inactive
-   we have $\lambda_i^{*}=0$. Thus  $\lambda^{*}_i \ge 0$, $g_i(x^{*})\le 0$,  $\lambda_i
-g(x^{*}) \le 0$. Also by construction of the problem $h_j(x)=0$ for all
-$j=1,\ldots,p$.
+   For the other conditions, we have for $i$ is active $g_i(x^{*}) = 0$ and
+   for $i$ inactive $\lambda_i^{*}=0$. Thus $\lambda^{*}_i \ge 0$,
+   $g_i(x^{*})\le 0$,  $\lambda_i g(x^{*}) \le 0$. Also by construction of
+   the problem $h_j(x^{*})=0$ for all $j=1,\ldots,p$.
 \end{proof}
 \section{Convex Case}
-Since Abadie CQ is an excellent result since it gives a hint how to find
-$x^{*}$. But it assumes something about $x^{*}$ before it is even found. In
-the case of convex optimization problems we can derive a much relaxed
-sufficient condition which implies Abadie CQ. Firstly a brief definition of
-convex functions
+Abadie CQ is an excellent result, giving us a hint of finding $x^{*}$.
+However, it assumes something about $x^{*}$ before it is even found. In the
+case of convex optimization problems we can derive a relaxed global condition
+on the optimization problem which implies Abadie CQ. Firstly a brief
+introduction on convex functions
 \begin{definition}
     Let $U \subseteq \mathbb{R}^{n}$, the function $f: U \to \mathbb{R}$
     is called convex if for all $x, y \in U$ and $\lambda \in [0, 1]$ it
@@ -420,15 +425,15 @@ An important result we will use throughout is the following.
     Rearranging, dividing by $\lambda$ and expanding the fraction by $x-y$ we
     get
     \begin{align}
-        \frac{f(y+\lambda(x-y)) - f(y)}{\lambda (x-y)}(x-y) \le f(x) - f(y)
+        \frac{f(y+\lambda(x-y)) - f(y)}{\lambda (x-y)}(x-y) \le f(x) - f(y).
     \end{align}
     Letting $\lambda \downarrow 0$ we get
     \begin{align}
         \nabla f(y)^{T} (x-y) \le f(x) - f(y).
     \end{align}
 For (2) $\Rightarrow$ (1) we know that $U$ is convex hence fix $x, y \in U$
-then for any $z$ in the line segment of $x$ and $y$ there is a $\lambda \in
-[0,1]$ such that $z = \lambda x + (1-\lambda)y$. We can construct two
+then for all $\lambda \in [0, 1]$ there is a $z$ in the line segment of $x$
+and $y$ such that $z = \lambda x + (1-\lambda)y$. We can construct two
 inequalities
 \begin{align}
     &\nabla f(z)^{T} (x-z) \le f(x) - f(z) \\
@@ -454,21 +459,21 @@ Adding them together gives
     (\nabla f(x) - \nabla f(y))^{T} (x-y) \le 0 .
 \end{align}
 For (3) $\Rightarrow$ (2) we consider a function $g(t) = f(t x + (1-t)y)$
-defined on the line segment of $x, y \in U$ for $t \in [0, 1]$ and
-well-defined since $U$ is convex. The derivative is
+defined on the line segment of $x, y \in U$ for $t \in [0, 1]$,
+well-defined since $U$ is convex. The derivative of $g$ is
 \begin{align}
-    g'(t) = \nabla f(t x + (1-t) y) (y-x)
+    g'(t) = \nabla f(t x + (1-t) y)^{T} (y-x)
 \end{align}
 Note that by (3) we have that
 \begin{align}
     \nabla f(x)^{T} (y-x) \le \nabla f(y)^{T} (y-x),
 \end{align}
-for all $x, y \in U$. Now we use the Mean Value theorem for $g$,
+for all $x, y \in U$. Now we use the Mean Value Theorem on $g$,
 \begin{align}
     f(y) - f(x) &= \int_0^1 g'(t) dt\\
-                &= \int_0^1 \nabla f(tx +(1-t)y)(y-x)dt\\
-                &\ge \int_0^1 \nabla f(x)(y-x) dt\\
-                &= \nabla f(x) (y-x).
+                &= \int_0^1 \nabla f(tx +(1-t)y)^{T}(y-x)dt\\
+                &\ge \int_0^1 \nabla f(x)^{T} (y-x) dt\\
+                &= \nabla f(x)^{T} (y-x).
 \end{align}
 Lastly for (2) $\Leftrightarrow$ (4) we use Taylor's Theorem, i.e. for all $x, y
 \in X$ we have
@@ -476,7 +481,7 @@ Lastly for (2) $\Leftrightarrow$ (4) we use Taylor's Theorem, i.e. for all $x, y
     f(y) = f(x) + \nabla f(x)^{T} (y-x) + \frac{1}{2}(y-x)^{T} \nabla^2
     f(\xi)(y-x),
 \end{align}
-for some $\xi$ in the line segment of $x$ and $y$. For $\Rightarrow$ we have
+for some $\xi$ in the line segment of $x$ and $y$. For $\Leftarrow$ we have
 that the Hessian is positive semidefinite $\frac{1}{2}(y-x)^{T} \nabla^2 f(\xi)(y-x) \ge 0$
 thus rearranging gives
 \begin{align}
@@ -499,11 +504,11 @@ Throughout this section consider the following convex problem
         &x \in \mathbb{R}^{n}\nonumber,
 \end{align}
 where $f, g_i$ are convex and continuously differentiable functions for all
-$i=1,\ldots,p$ and the function $h$ becomes affine linear, i.e. $h(x) =
-Ax-b$, where $A \in \mathbb{R}^{p\times n}, b\in \mathbb{R}^{p}$. The
-feasible set $X$ of problem \ref{eq: convex_constrained} is a convex set in
-this case. An important condition for convex problems is the so called Slater
-constraint qualification (CQ).
+$i=1,\ldots,p$ and the function $h$ are affine linear, i.e. $h(x) = Ax-b$,
+where $A \in \mathbb{R}^{p\times n}, b\in \mathbb{R}^{p}$. The feasible set
+$X$ of problem \ref{eq: convex_constrained} is a convex set in this case. An
+important condition for convex problems is the so called Slater constraint
+qualification (CQ).
 \begin{definition}
     The optimization problem \ref{eq: convex_constrained} fulfills the Slater
     CQ if there exists an $x' \in \mathbb{R}^{n}$ such that
@@ -518,18 +523,20 @@ Given Slater CQ we can prove the following
     Let $ x^{*} $ be a local minimum of \ref{eq: convex_constrained} and the
     problem fulfills Slater CQ. Then there exist Lagrange multipliers
     $\lambda^{*} \in \mathbb{R}^{m}$ and $\mu^{*} \in \mathbb{R}^{p}$  such
-    $(x^{*},\lambda^{*},\mu^{*})$ is a KKT point of \ref{eq:
-    convex_constrained}.
+    $(x^{*},\lambda^{*},\mu^{*})$ is a KKT point of
+    \ref{eq: convex_constrained}.
 \end{theorem}
 \begin{proof}
 We show that $x^{*}$ fulfills Abadie CQ, i.e. $T_{\text{lin}}(x^{*})
 \subseteq T_X(x^{*})$. Let $d \in T_{\text{lin}}(x^{*})$ and choose an $x'
 \in X$ satisfying Slater CQ. Set $d' := x' - x^{*}$, by Proposition
-\ref{prop: convexity} (2) we have for all $i \in \mathcal{A}(x^{*})$ that
+\ref{prop: convexity} (2) we have for all $i \in \mathcal{A}(x^{*})$ the
+following
 \begin{align}
     \nabla g_i(x^{*})^{T} d'
     &= \nabla g_i(x^{*})^{T} (x^{*} + d' - x^{*} )\\
-    &\le g_i(x^{*} +d') -g_i(x^{*}) < 0,
+    &\le g_i(x^{*} +d') -g_i(x^{*}) \\
+    &< 0,
 \end{align}
 where $g(x') < 0$ by Slater CQ and $g_i(x^{*}) = 0$ for all active indices
 which we considered. Also
@@ -546,8 +553,9 @@ for all $i \in \mathcal{A}(x^{*})$ and
 \begin{align}
     Ad(\tau) = Ad + \tau Ad' = 0.
 \end{align}
-We can show that $d(\tau) \in T_X(x^{*})$ for all $\tau >0 $, which concludes
-the proof by the closure of $T_X(x^{*})$. Let
+We show that $d(\tau) \in T_X(x^{*})$ for all $\tau >0 $, which concludes
+the proof by the closure of $T_X(x^{*})$. The cone $T_X(x^{*})$ in the case
+$X$ is convex can be written as $T_X(x^{*}) = \text{cl}(\text{cone}(X-x^{*}))$. Let
 \begin{align}
     x^{k}  = x^{*} + \frac{1}{k}d(\tau),\\
     t_k = 1/k,
@@ -556,11 +564,11 @@ for $k \in \mathbb{N}$. This gives
 \begin{align}
     \frac{x^{k} - x^{*}  }{t_k} = d(\tau)
 \end{align}
-To finish the proof, we need to show that $x^{k}  \in X$, the feasible set,
-i.e. we show that $g_i(x^{k}) \le 0$ for all $i=1,\ldots,m$ and $Ax^{k} -b =
+To finish the proof, we need to show that $x^{k}  \in X$.
+We show that $g_i(x^{k}) \le 0$ for all $i=1,\ldots,m$ and $Ax^{k} -b =
 0$ for all $k$ large enough. Indeed for all $i \in \mathcal{A}(x^{*})$ by the
 Mean Value Theorem, we can find for each $k\ge 1$ a $\xi^{k}$ in the line
-segment of $x^{*}$ and $x^{k}$ sucht that
+segment of $x^{*}$ and $x^{k}$ such that
 \begin{align}
     g_i(x^{k})
     &= g_i(x^{k}) - g_i(x^{*}) \\
@@ -584,7 +592,7 @@ So there is a $k_1^{i} \ge 1$ such that
 \begin{align}
     g_i(x^{k}) < 0 \quad \forall k \ge k_1^{i}.
 \end{align}
-Taking $k_0 = \max{k_0^{i} , k_1^{i}}$ over all indices $i = 1,\ldots,m$
+Taking $k_0 = \max_{i=1,\ldots,m}\{k_0^{i} , k_1^{i}\}$
 shows the first part. Lastly
 \begin{align}
     Ax^{k} = A x^{*}  + \frac{1}{k}Ad(\tau) = b,
@@ -592,8 +600,8 @@ shows the first part. Lastly
 since $x^{*} \in X$ and $Ad(\tau) = 0$. This shows $d(\tau) \in T_X(x^{*})$
 and by continuity $d \in T_X(x^{*})$.
 \end{proof}
-Thus Salter CQ implies Abadie CQ and we can show that KKT optimality
-conditions are sufficient for optimality
+Thus Salter CQ implies Abadie CQ and KKT-conditions in this case
+are also sufficient for optimality.
 \begin{theorem}
     Let $(x^{*}, \lambda^{*},\mu^{*})$ be a KKT point of
     \ref{eq: convex_constrained}. Then $x^{*}$ is a local minimum of
