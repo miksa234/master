@@ -86,10 +86,7 @@ class Reinforce:
         test_rewards_hist = []
 
         for itr in range(self.args['num_reinforce']):
-            if itr % 2 == 0:
-                at_block = 10
-            else:
-                at_block = 11
+            at_block = 10
             self.mdp.current_block = at_block
             self.mcts.mdp.current_block = at_block
 

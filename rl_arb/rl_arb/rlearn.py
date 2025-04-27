@@ -151,12 +151,11 @@ class AgentRLearn():
             mean_val = np.mean(vs[idxs])
 
             if block not in self.baseline_tracker:
-                self.baseline_tracker[block] = mean_val
+                self.baseline_tracker[block] = list(vs[idxs])
             else:
-                self.baseline_tracker[block] = 1/2 * (mean_val + self.baseline_tracker[block])
+                self.baseline_tracker[block].append(vs[idxs])
 
-            baseline[idxs] = self.baseline_tracker[block]
-
+            baseline[idxs] = np.mean(self.baseline_tracker[block])
 
         return baseline*np.array(gamma_factors)
 
@@ -248,13 +247,12 @@ class AgentRLearn():
             with open("values.pickle", "wb") as f:
                 pickle.dump(self.values, f)
 
-            test_values = self.test_model(iteration)
-            self.test_values.append(test_values)
-            average_value = float(np.mean(test_values))
-            with open("test_values.pickle", "wb") as f:
-                pickle.dump(self.test_values, f)
-
-            send_telegram_message(f"Average profit {average_value}")
+            #test_values = self.test_model(iteration)
+            #self.test_values.append(test_values)
+            #average_value = float(np.mean(test_values))
+            #with open("test_values.pickle", "wb") as f:
+            #    pickle.dump(self.test_values, f)
+            #send_telegram_message(f"Average profit {average_value}")
 
         if self.args['telegram']:
             send_telegram_message("DONE!")
