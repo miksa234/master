@@ -153,7 +153,7 @@ class AgentRLearn():
             if block not in self.baseline_tracker:
                 self.baseline_tracker[block] = list(vs[idxs])
             else:
-                self.baseline_tracker[block].append(vs[idxs])
+                self.baseline_tracker[block] += list(vs[idxs])
 
             baseline[idxs] = np.mean(self.baseline_tracker[block])
 
