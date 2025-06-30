@@ -66,7 +66,7 @@ class MDP:
             start_node=0
     ):
         """
-        Constructs all the necessary attributes for the NetGame object.
+        Constructs all the necessary attributes for the MDP object.
 
         Parameters:
         -----------
@@ -158,7 +158,7 @@ class MDP:
 
     def check_win(self, state):
         """
-        Checks if the current state is a terminal state.
+        Checks if the state is a win.
 
         Parameters:
         -----------
